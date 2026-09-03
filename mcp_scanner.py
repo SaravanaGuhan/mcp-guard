@@ -2700,14 +2700,9 @@ class UniversalStaticAnalyzer:
         process = None
         
         try:
-            # Special handling for Airbnb MCP server
-            if self._detect_airbnb_server(server_info):
-                process = await self._handle_airbnb_server_startup(server_info)
-            else:
-                # Standard server startup
-                server_path = self._get_server_executable_path(server_info)
-                if server_path:
-                    process = await self._start_mcp_server_process(server_path, server_info.server_type)
+            server_path = self._get_server_executable_path(server_info)
+            if server_path:
+                process = await self._start_mcp_server_process(server_path, server_info.server_type)
             
             if process:
                 logger.info("✅ Server started successfully - performing live fuzzing")
@@ -3245,88 +3240,6 @@ class UniversalStaticAnalyzer:
         
         return None
     
-    def _detect_airbnb_server(self, server_info: MCPServerInfo) -> bool:
-        """Detect if this is the Airbnb MCP server"""
-        if 'airbnb' in server_info.repo_url.lower():
-            return True
-        
-        # Check package.json for Airbnb server
-        package_json_path = os.path.join(server_info.local_path, 'package.json')
-        if os.path.exists(package_json_path):
-            try:
-                with open(package_json_path, 'r') as f:
-                    package_data = json.load(f)
-                    name = package_data.get('name', '').lower()
-                    if 'airbnb' in name or 'openbnb' in name:
-                        return True
-            except:
-                pass
-        
-        return False
-    
-    async def _handle_airbnb_server_startup(self, server_info: MCPServerInfo) -> Optional[subprocess.Popen]:
-        """Special handling for Airbnb MCP server startup"""
-        try:
-            logger.info("🏠 Detected Airbnb MCP server - using NPX startup")
-            
-            # Try different ways to run the Airbnb server
-            startup_commands = [
-                ["npx", "-y", "@openbnb/mcp-server-airbnb"],
-                ["npx", "@openbnb/mcp-server-airbnb"],
-                ["cmd", "/c", "npx", "-y", "@openbnb/mcp-server-airbnb"],  # Windows cmd wrapper
-                ["powershell", "-Command", "npx -y @openbnb/mcp-server-airbnb"],  # PowerShell wrapper
-            ]
-            
-            for cmd in startup_commands:
-                try:
-                    logger.info(f"Trying command: {' '.join(cmd)}")
-                    
-                    process = subprocess.Popen(
-                        cmd,
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        cwd=server_info.local_path,
-                        bufsize=0,
-                        shell=(cmd[0] in ["cmd", "powershell"])  # Use shell for cmd/powershell
-                    )
-                    
-                    # Give NPX time to download and start the server
-                    logger.info("⏳ Waiting for NPX to download and start server...")
-                    await asyncio.sleep(10)
-                    
-                    # Check if process is still running
-                    if process.poll() is None:
-                        logger.info("✅ Server process is running, testing MCP protocol...")
-                        
-                        # Test MCP protocol
-                        if await self._test_mcp_protocol(process):
-                            logger.info("✅ Airbnb server is responding to MCP protocol")
-                            return process
-                        else:
-                            logger.info("⚠️ Server running but not responding to MCP protocol")
-                    else:
-                        # Process died, check error output
-                        stdout, stderr = process.communicate()
-                        logger.debug(f"Process died. STDOUT: {stdout[:200]}, STDERR: {stderr[:200]}")
-                        continue
-                    
-                    # Clean up failed attempt
-                    if process.poll() is None:
-                        process.terminate()
-                        
-                except Exception as e:
-                    logger.debug(f"Command {cmd[0]} failed: {e}")
-                    continue
-            
-            logger.warning("having trouble to start Airbnb server with any method")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Airbnb server startup failed: {e}")
-            return None
-
     def _get_server_executable_path(self, server_info: MCPServerInfo) -> Optional[str]:
         """Find the actual executable server file with enhanced detection"""
         # Silently look for executable server
@@ -3535,7 +3448,6 @@ for line in sys.stdin:
             
             # Try different NPX startup methods
             npx_commands = [
-                ["npx", "-y", "@openbnb/mcp-server-airbnb"],  # Direct NPX execution
                 ["npm", "start"],  # NPM start script
                 ["node", "dist/index.js"],  # Built version
                 ["node", "build/index.js"],  # Alternative build
@@ -3869,34 +3781,6 @@ for line in sys.stdin:
                 "params": method_info["params"]
             })
         
-        # 3. Airbnb MCP server specific tests (since you mentioned it)
-        airbnb_payloads = [
-            {
-                "jsonrpc": "2.0",
-                "id": 10,
-                "method": "tools/call",
-                "params": {
-                    "name": "airbnb_search",
-                    "arguments": {
-                        "location": "New York",
-                        "checkin": "2024-12-01",
-                        "checkout": "2024-12-02"
-                    }
-                }
-            },
-            {
-                "jsonrpc": "2.0",
-                "id": 11,
-                "method": "tools/call",
-                "params": {
-                    "name": "airbnb_listing_details",
-                    "arguments": {
-                        "id": "12345"
-                    }
-                }
-            }
-        ]
-        payloads.extend(airbnb_payloads)
         
         # 4. Vulnerability testing payloads
         vuln_tests = [
@@ -5411,33 +5295,10 @@ def main():
     print(f"\nDetailed vulnerability information saved to: {output_file}")
     print(f"MCP Guard - Professional security scanner with CVSS v4.0 and AIVSS scoring")
 
-def test_dynamic_fuzzing():
-    """Test function to verify dynamic fuzzing works"""
-    print("Testing MCP Guard Dynamic Fuzzing...")
-    
-    # Test with Airbnb MCP server
-    airbnb_url = "https://github.com/openbnb-org/mcp-server-airbnb"
-    
-    scanner = UniversalMCPScanner()
-    results = scanner.scan_mcp_server(airbnb_url, 'dynamic')
-    
-    print(f"Dynamic fuzzing test results:")
-    print(f"- Total vulnerabilities: {len(results.get('vulnerabilities', []))}")
-    print(f"- Server type: {results.get('server_info', {}).get('server_type', 'unknown')}")
-    
-    if results.get('vulnerabilities'):
-        print("✅ Dynamic fuzzing is working!")
-        for vuln in results['vulnerabilities'][:3]:  # Show first 3
-            print(f"  - {vuln.get('title', 'Unknown')}")
-    else:
-        print("⚠️ No vulnerabilities found - check if server started properly")
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) > 1 and sys.argv[1] == "--test-dynamic":
-            test_dynamic_fuzzing()
-        else:
-            main()
+        main()
     except (OSError, IOError, BrokenPipeError) as e:
         # Suppress Windows-specific subprocess cleanup errors
         if "Invalid argument" in str(e):

@@ -1,7 +1,6 @@
 # Core dependencies for MCP Guard Security Scanner
 requests>=2.31.0
 pyyaml>=6.0
-asyncio-compat>=0.1.2
 
 # Optional dependencies for enhanced functionality
 websockets>=11.0.0  # For WebSocket MCP server testing

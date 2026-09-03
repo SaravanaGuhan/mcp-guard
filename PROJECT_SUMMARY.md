@@ -97,20 +97,7 @@ mcp-guard/
 - **Memory Management**: Proper resource cleanup
 - **Scalable Architecture**: Supports batch processing
 
-## 🎯 Real-World Testing
-
-### Tested MCP Servers
-- ✅ **Airbnb MCP Server** (Node.js) - Found 5 vulnerabilities
-- ✅ **Cloudflare MCP Server** (Node.js) - Comprehensive analysis
-- ✅ **GitHub MCP Server** (Go) - Protocol validation
-- ✅ **PostgreSQL MCP Server** (Python) - Database security
-- ✅ **Docker MCP Server** (Go) - Container security
-
-### Vulnerability Discovery
-- **Real Vulnerabilities Found**: Actual security issues in production MCP servers
-- **Low False Positive Rate**: Intelligent pattern matching reduces noise
-- **Comprehensive Coverage**: 15+ vulnerability categories, 20+ CWE mappings
-- **Actionable Results**: Clear remediation guidance for each finding
+---
 
 ## 🏆 Industry Impact
 

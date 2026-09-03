@@ -15,34 +15,17 @@ pip install -r requirements.txt
 
 ### Step 3: Run Your First Scan
 ```bash
-python mcp_scanner.py https://github.com/openbnb-org/mcp-server-airbnb
+python mcp_scanner.py <repository-url>
 ```
 
 That's it! 🎉
 
-## What You'll See
-
-```
-================================================================================
-MCP GUARD SECURITY ASSESSMENT REPORT
-================================================================================
-Target: https://github.com/openbnb-org/mcp-server-airbnb
-Total Vulnerabilities: 5
-Overall Risk: MEDIUM
-
-CRITICAL SEVERITY (1 findings):
-  [1] Command Injection Vulnerability
-      CVSS Score: 8.5
-      File: src/server.js
-      Line: 45
-```
+---
 
 ## Try More Examples
 
 ```bash
 # Scan different MCP servers
-python mcp_scanner.py https://github.com/cloudflare/mcp-server-cloudflare
-python mcp_scanner.py https://github.com/github/github-mcp-server
 
 # Run interactive examples
 python examples/basic_scan.py

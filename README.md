@@ -40,7 +40,7 @@ cd mcp-guard
 pip install -r requirements.txt
 
 # Scan an MCP server
-python mcp_scanner.py https://github.com/openbnb-org/mcp-server-airbnb
+python mcp_scanner.py <repository-url>
 ```
 
 **That's it!** MCP Guard will automatically detect the server type, perform comprehensive security analysis, and provide detailed vulnerability reports.
@@ -97,44 +97,6 @@ MCP Guard identifies security issues across multiple categories:
 | **Configuration** | Insecure defaults, exposed secrets | Medium - Low |
 | **Dependencies** | Known CVEs, outdated packages | Critical - Info |
 | **Code Quality** | Hardcoded credentials, unsafe functions | High - Low |
-
----
-
-## Sample Output
-
-```
-================================================================================
-MCP GUARD SECURITY ASSESSMENT REPORT
-================================================================================
-Target: https://github.com/openbnb-org/mcp-server-airbnb
-Server Type: Node.js MCP Server
-Scan Duration: 45.2 seconds
-
-VULNERABILITY SUMMARY
-├── Total Issues: 5
-├── Critical: 1    High: 2    Medium: 1    Low: 1
-├── CVSS v4.0 Average: 6.8
-└── Overall Risk: HIGH
-
-CRITICAL SEVERITY FINDINGS
-┌─────────────────────────────────────────────────────────────────────────────
-│ [CVE-2024-XXXX] Command Injection in Tool Handler
-│ CVSS Score: 9.1 (CRITICAL)  |  AIVSS Score: 8.7 (AI_HIGH)
-│ File: src/tools/system.js:45
-│ 
-│ Description: Unsanitized user input passed to child_process.exec()
-│ Impact: Remote code execution on server
-│ Remediation: Implement input validation and use parameterized commands
-└─────────────────────────────────────────────────────────────────────────────
-
-RECOMMENDATIONS
-• Implement comprehensive input validation for all MCP tool parameters
-• Update 3 vulnerable dependencies (express, lodash, axios)
-• Enable security headers and HTTPS enforcement
-• Add rate limiting to prevent abuse
-
-Scan completed successfully ✓
-```
 
 ---
 
@@ -198,22 +160,6 @@ results = scanner.scan_mcp_server(
 print(f"Found {len(results['vulnerabilities'])} vulnerabilities")
 print(f"Overall risk: {results['summary']['risk_assessment']['overall_risk']}")
 ```
-
-
-
----
-
-## Supported MCP Servers
-
-MCP Guard has been tested with popular MCP server implementations:
-
-| Server | Language | Status | Vulnerabilities Found |
-|--------|----------|--------|--------------------|
-| [Airbnb MCP Server](https://github.com/openbnb-org/mcp-server-airbnb) | Node.js | ✅ Tested | 5 issues identified |
-| [Cloudflare MCP Server](https://github.com/cloudflare/mcp-server-cloudflare) | Node.js | ✅ Tested | 3 issues identified |
-| [GitHub MCP Server](https://github.com/github/github-mcp-server) | Go | ✅ Tested | 2 issues identified |
-| [PostgreSQL MCP Server](https://github.com/crystaldba/postgres-mcp) | Python | ✅ Tested | 4 issues identified |
-| [Docker MCP Server](https://github.com/docker/mcp-server) | Go | ✅ Tested | 1 issue identified |
 
 ---
 

@@ -191,7 +191,7 @@ Now let's run your first real security scan:
 
 ```cmd
 # Scan the Airbnb MCP Server (Node.js)
-python mcp_scanner.py https://github.com/openbnb-org/mcp-server-airbnb
+python mcp_scanner.py <repository-url>
 ```
 
 ### Expected Output
@@ -202,7 +202,7 @@ You should see output similar to:
 ================================================================================
 MCP GUARD SECURITY ASSESSMENT REPORT
 ================================================================================
-Target: https://github.com/openbnb-org/mcp-server-airbnb
+Target: <repository-url>
 Scan Type: COMPREHENSIVE (STATIC + DYNAMIC)
 Timestamp: 2025-08-02 12:00:00 UTC
 
@@ -238,7 +238,7 @@ CRITICAL SEVERITY (1 findings):
 ### Report Files
 
 After the scan, you'll find detailed reports in your directory:
-- `mcp_security_scan_mcp-server-airbnb_YYYYMMDD_HHMMSS.json`
+- `mcp_security_scan_<repo>_YYYYMMDD_HHMMSS.json`
 
 ## 🚨 Troubleshooting
 

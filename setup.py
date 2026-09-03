@@ -46,7 +46,6 @@ setup(
     install_requires=[
         "requests>=2.31.0",
         "pyyaml>=6.0",
-        "asyncio-compat>=0.1.2",
     ],
     extras_require={
         "full": [
