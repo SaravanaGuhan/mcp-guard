@@ -86,9 +86,7 @@ mcp-guard/
 
 ### Security Features
 - **Safe Repository Handling**: Secure download and cleanup
-- **Sandboxed Execution**: Isolated dynamic analysis
 - **Input Validation**: Protection against malicious inputs
-- **Resource Limits**: CPU, memory, and time constraints
 - **Network Security**: HTTPS-only downloads, timeout protection
 
 ### Performance
