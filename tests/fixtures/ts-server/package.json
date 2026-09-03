@@ -1,0 +1,8 @@
+{
+  "name": "ts-mcp-server",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": { "build": "tsc -p ." },
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.0.1" },
+  "devDependencies": { "typescript": "^5.8.2" }
+}
