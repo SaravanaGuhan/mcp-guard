@@ -53,7 +53,7 @@ def _evidence_block(f: Finding) -> List[str]:
     return out
 
 
-def render(result: ScanResult) -> str:
+def render(result: ScanResult, shown=None, suppressed: int = 0) -> str:
     L: List[str] = []
     L.append(BAR)
     L.append("MCP GUARD SECURITY REPORT")
@@ -97,9 +97,11 @@ def render(result: ScanResult) -> str:
     L.append(SUB)
     L.append("FINDINGS")
     L.append(SUB)
+    shown_n = len(result.findings) if shown is None else len(shown)
     L.append(
-        f"  total {len(result.findings)}   "
-        f"critical {counts['critical']}  high {counts['high']}  "
+        f"  total {len(result.findings)}"
+        + (f" (showing {shown_n})" if shown_n != len(result.findings) else "")
+        + f"   critical {counts['critical']}  high {counts['high']}  "
         f"medium {counts['medium']}  low {counts['low']}"
     )
     L.append(
@@ -108,11 +110,14 @@ def render(result: ScanResult) -> str:
     )
     L.append("")
 
-    if not result.findings:
+    findings = result.findings if shown is None else shown
+
+    if not findings:
         L.append("  No findings. Note which stages ran above before reading this")
         L.append("  as 'clean'.")
     else:
-        for i, f in enumerate(result.sorted_findings(), 1):
+        ordered = sorted(findings, key=lambda f: (-f.cvss_score, f.rule_id))
+        for i, f in enumerate(ordered, 1):
             L.append(
                 f"  [{i}] {f.severity.value.upper():<8} {f.cvss_score:4.1f}  "
                 f"{f.rule_id}"
@@ -125,6 +130,14 @@ def render(result: ScanResult) -> str:
                     L.append(f"      fix: {line}" if line == textwrap.wrap(f.remediation, 66)[0]
                              else f"           {line}")
             L.append("")
+
+    if suppressed:
+        L.append(f"  {suppressed} further dependency finding(s) not shown "
+                 f"(transitive, dev, or below --min-severity).")
+        L.append("  Show them with --include-transitive --include-dev "
+                 "--min-severity low.")
+        L.append("  The JSON report always contains every finding.")
+        L.append("")
 
     L.append(BAR)
     return "\n".join(L)

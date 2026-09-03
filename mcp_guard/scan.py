@@ -133,9 +133,10 @@ def run_scan(
             st.skip("offline mode: OSV lookup skipped")
         else:
             from .deps import run_dependencies
-            found = run_dependencies(info)
+            dart: dict = {}
+            found = run_dependencies(info, artifacts=dart)
             result.findings.extend(found)
-            st.done(findings=len(found))
+            st.done(findings=len(found), **dart)
 
     # ---------------- dynamic ----------------
     with Stage(result, "dynamic") as st:

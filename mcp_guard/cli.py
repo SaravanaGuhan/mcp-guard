@@ -83,6 +83,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     out.add_argument("-o", "--output", help="write the report to this path")
     out.add_argument(
+        "--include-transitive", action="store_true",
+        help="show dependency findings for transitive packages too "
+             "(the JSON report always contains them)",
+    )
+    out.add_argument(
+        "--include-dev", action="store_true",
+        help="show dependency findings for devDependencies too",
+    )
+    out.add_argument(
+        "--min-severity",
+        choices=("low", "medium", "high", "critical"), default="medium",
+        help="minimum severity for dependency findings in the CONSOLE "
+             "report (default: medium); JSON is never filtered",
+    )
+    out.add_argument(
         "--fail-on",
         choices=("none", "low", "medium", "high", "critical"),
         default="high",
@@ -127,7 +142,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.format == "sarif":
             text = sarif_report.render(result)
         else:
-            text = console_report.render(result)
+            from .deps import filter_findings
+            shown, suppressed = filter_findings(
+                result.findings,
+                include_transitive=args.include_transitive,
+                include_dev=args.include_dev,
+                min_severity=args.min_severity)
+            text = console_report.render(result, shown=shown,
+                                         suppressed=suppressed)
 
         if args.output:
             with open(args.output, "w", encoding="utf-8") as fh:

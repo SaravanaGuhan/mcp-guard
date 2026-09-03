@@ -11,6 +11,8 @@ import pytest
 
 import os
 
+ADVISORY_ID_RE = r"^(GHSA|CVE|OSV|PYSEC|GO|MAL)-[\w.-]+$"
+
 from conftest import (fixture_path, needs_network, needs_node,
                       rule_ids, run_scan_on, stage)
 
@@ -239,8 +241,31 @@ def test_vuln_deps_reports_real_osv_advisories():
     for f in r.findings:
         ev = f.evidence
         assert ev.advisory_id, "empty advisory id"
-        assert re.match(r"^(GHSA|CVE|OSV|PYSEC|GO|MAL)-[\w.-]+$", ev.advisory_id), \
-            f"malformed advisory id {ev.advisory_id!r}"
+        # Phase E groups by (package, version), so advisory_id carries
+        # every id OSV returned for that package, comma-separated.
+        for one in [x.strip() for x in ev.advisory_id.split(",")]:
+            assert re.match(ADVISORY_ID_RE, one), (
+                f"malformed advisory id {one!r}")
         assert ev.installed_version
         assert ev.affected_range
         assert ev.lockfile
+
+
+
+@needs_network
+def test_grouping_preserves_every_advisory_id():
+    """Grouping must compress the report, never lose data."""
+    from mcp_guard.deps import lockfiles, osv
+
+    pinned, _ = lockfiles.collect(fixture_path("vuln-deps"))
+    raw = osv.query([p.purl for p in pinned])
+    raw_ids = {a.id for advs in raw.values() for a in advs}
+
+    r = run_scan_on("vuln-deps", deps_enabled=True, static_enabled=False)
+    grouped = set()
+    for f in r.findings:
+        grouped |= {i.strip() for i in f.evidence.advisory_id.split(",")}
+
+    assert not (raw_ids - grouped), (
+        f"grouping lost advisories: {sorted(raw_ids - grouped)}")
+    assert len(r.findings) < len(raw_ids), "grouping compressed nothing"

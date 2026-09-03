@@ -34,6 +34,8 @@ class Pinned:
     ecosystem: str
     lockfile: str      # repo-relative
     line: int
+    direct: bool = True   # named by the project itself, not pulled in
+    dev: bool = False     # devDependency / test extra
 
     @property
     def purl(self) -> str:
@@ -252,6 +254,34 @@ _PARSERS = [
 ]
 
 
+def _manifest_sets(root: str) -> Tuple[set, set]:
+    """(direct package names, dev package names) as the project declares them.
+
+    Read from package.json rather than inferred from lockfile nesting, because
+    npm v3+ hoists everything to a flat node_modules and depth stops meaning
+    anything.
+    """
+    direct, dev = set(), set()
+    pj = os.path.join(root, "package.json")
+    if os.path.exists(pj):
+        data = _read_json_safe(pj)
+        if isinstance(data, dict):
+            for k in ("dependencies", "optionalDependencies",
+                      "peerDependencies"):
+                direct.update((data.get(k) or {}).keys())
+            dev.update((data.get("devDependencies") or {}).keys())
+            direct.update(dev)
+    return direct, dev
+
+
+def _read_json_safe(path: str):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
 def collect(root: str) -> Tuple[List[Pinned], List[str]]:
     """Return (pinned packages, names of lockfiles actually parsed)."""
     found: List[Pinned] = []
@@ -276,6 +306,8 @@ def collect(root: str) -> Tuple[List[Pinned], List[str]]:
                 found.extend(pkgs)
                 used.append("package.json (exact pins only)")
 
+    direct_names, dev_names = _manifest_sets(root)
+
     # de-duplicate on (ecosystem, name, version), keeping the first location
     seen = set()
     unique: List[Pinned] = []
@@ -283,5 +315,8 @@ def collect(root: str) -> Tuple[List[Pinned], List[str]]:
         if p.key() in seen:
             continue
         seen.add(p.key())
+        if p.ecosystem == ECOSYSTEM_NPM and direct_names:
+            p = Pinned(p.name, p.version, p.ecosystem, p.lockfile, p.line,
+                       direct=p.name in direct_names, dev=p.name in dev_names)
         unique.append(p)
     return unique, used

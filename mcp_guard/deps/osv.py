@@ -41,12 +41,24 @@ def _cache_path(key: str) -> str:
     return os.path.join(cache_dir(), f"{h}.json")
 
 
+_CACHE_STATS = {"hits": 0, "misses": 0}
+
+
+def cache_stats() -> Dict[str, int]:
+    return dict(_CACHE_STATS)
+
+
 def cache_get(key: str) -> Optional[Any]:
     p = _cache_path(key)
     try:
         with open(p, encoding="utf-8") as fh:
-            return json.load(fh)
+            value = json.load(fh)
+        if key.startswith("purl:"):
+            _CACHE_STATS["hits"] += 1
+        return value
     except Exception:
+        if key.startswith("purl:"):
+            _CACHE_STATS["misses"] += 1
         return None
 
 
