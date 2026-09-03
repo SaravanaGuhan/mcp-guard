@@ -121,7 +121,15 @@ def _traces_to_param(arg, src: bytes) -> Optional[str]:
     return None
 
 
+def parse(src: bytes):
+    """Parse once. The driver shares the tree with every JS rule."""
+    if not AVAILABLE:
+        return None
+    return Parser(_LANG).parse(src)
+
+
 def analyze_file(path: str, rel: str) -> List[Finding]:
+    """Convenience wrapper: read, parse, analyse. Used by tests."""
     if not AVAILABLE:
         return []
     try:
@@ -129,9 +137,15 @@ def analyze_file(path: str, rel: str) -> List[Finding]:
             src = fh.read()
     except OSError:
         return []
+    tree = parse(src)
+    if tree is None:
+        return []
+    return analyze_tree(tree, src, rel)
 
-    parser = Parser(_LANG)
-    tree = parser.parse(src)
+
+def analyze_tree(tree, src: bytes, rel: str) -> List[Finding]:
+    if not AVAILABLE or tree is None:
+        return []
     text_lines = src.decode("utf-8", errors="replace").splitlines()
     findings: List[Finding] = []
     seen: Set[Tuple[str, int]] = set()

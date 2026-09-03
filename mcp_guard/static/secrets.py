@@ -107,6 +107,7 @@ def _finding(rel: str, line: int, col: int, matched: str, why: str) -> Finding:
 
 
 def analyze_file(path: str, rel: str) -> List[Finding]:
+    """Convenience wrapper: read then analyse. Used by tests."""
     if is_excluded(rel):
         return []
     try:
@@ -114,7 +115,12 @@ def analyze_file(path: str, rel: str) -> List[Finding]:
             text = fh.read()
     except OSError:
         return []
+    return analyze_text(text, rel)
 
+
+def analyze_text(text: str, rel: str) -> List[Finding]:
+    if is_excluded(rel):
+        return []
     out: List[Finding] = []
     seen: set = set()
 

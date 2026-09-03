@@ -114,6 +114,7 @@ def _shell_true(call: ast.Call) -> bool:
 
 
 def analyze_file(path: str, rel: str) -> List[Finding]:
+    """Convenience wrapper: read, parse, analyse. Used by tests."""
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             source = fh.read()
@@ -123,7 +124,16 @@ def analyze_file(path: str, rel: str) -> List[Finding]:
         tree = ast.parse(source, filename=rel)
     except SyntaxError:
         return []
+    return analyze_tree(tree, source, rel)
 
+
+def analyze_tree(tree, source: str, rel: str) -> List[Finding]:
+    """Analyse an already-parsed module.
+
+    The tree is parsed once per file by the static driver and shared with every
+    rule that needs it. Previously ast_python and mcp_rules each parsed the same
+    file independently.
+    """
     lines = source.splitlines()
     findings: List[Finding] = []
 

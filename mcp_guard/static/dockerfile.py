@@ -45,12 +45,16 @@ def _logical_lines(text: str) -> List[Tuple[int, str]]:
 
 
 def analyze_file(path: str, rel: str) -> List[Finding]:
+    """Convenience wrapper: read then analyse. Used by tests."""
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             text = fh.read()
     except OSError:
         return []
+    return analyze_text(text, rel)
 
+
+def analyze_text(text: str, rel: str) -> List[Finding]:
     findings: List[Finding] = []
     last_user: Optional[str] = None
     saw_stage = False

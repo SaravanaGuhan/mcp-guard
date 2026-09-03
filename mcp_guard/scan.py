@@ -64,6 +64,7 @@ def run_scan(
     offline: bool = False,
     timeout: int = 120,
     skip_install: bool = False,
+    use_cache: bool = True,
     entrypoint: Optional[str] = None,
 ) -> tuple[ScanResult, Optional[Acquired]]:
     result = ScanResult(
@@ -116,9 +117,11 @@ def run_scan(
             st.skip("detection did not complete")
         else:
             from .static import run_static
-            found: List[Finding] = run_static(info)
+            sart: dict = {}
+            found: List[Finding] = run_static(info, artifacts=sart,
+                                              use_cache=use_cache)
             result.findings.extend(found)
-            st.done(findings=len(found))
+            st.done(findings=len(found), **sart)
 
     # ---------------- dependencies ----------------
     with Stage(result, "dependencies") as st:

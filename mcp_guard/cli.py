@@ -68,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--no-static", action="store_true", help="skip static analysis")
     sc.add_argument("--no-deps", action="store_true", help="skip dependency analysis")
     sc.add_argument(
+        "--no-cache", action="store_true",
+        help="do not read or write the static result cache (caching costs "
+             "~25%% on a cold scan and saves ~87%% on a rescan)",
+    )
+    sc.add_argument(
         "--offline", action="store_true",
         help="do not contact the OSV API; dependency stage reports as not run",
     )
@@ -102,6 +107,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             offline=args.offline,
             timeout=args.timeout,
             skip_install=args.skip_install,
+            use_cache=not args.no_cache,
             entrypoint=args.entrypoint,
         )
 

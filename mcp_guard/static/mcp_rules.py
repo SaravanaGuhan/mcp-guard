@@ -115,6 +115,7 @@ def _enclosing_source(node, src: bytes, span: int = 4000) -> str:
 
 
 def analyze_js(path: str, rel: str) -> List[Finding]:
+    """Convenience wrapper: read, parse, analyse. Used by tests."""
     if not AVAILABLE:
         return []
     try:
@@ -122,9 +123,12 @@ def analyze_js(path: str, rel: str) -> List[Finding]:
             src = fh.read()
     except OSError:
         return []
+    return analyze_js_tree(Parser(_LANG).parse(src), src, rel)
 
-    parser = Parser(_LANG)
-    tree = parser.parse(src)
+
+def analyze_js_tree(tree, src: bytes, rel: str) -> List[Finding]:
+    if not AVAILABLE or tree is None:
+        return []
     findings: List[Finding] = []
     seen: Set[Tuple[str, int]] = set()
 
@@ -198,18 +202,22 @@ def analyze_js(path: str, rel: str) -> List[Finding]:
 
 
 def analyze_py(path: str, rel: str) -> List[Finding]:
+    """Convenience wrapper: read then analyse. Used by tests."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return []
+    return analyze_py_text(text, rel)
+
+
+def analyze_py_text(text: str, rel: str) -> List[Finding]:
     """Python MCP servers: description and URI-concat checks only.
 
     Tool schemas in the Python SDK are usually derived from type hints rather
     than written as literals, so the undeclared-argument check does not apply
     and is deliberately not attempted here.
     """
-    try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            text = fh.read()
-    except OSError:
-        return []
-
     findings: List[Finding] = []
     seen: Set[Tuple[str, int]] = set()
 
