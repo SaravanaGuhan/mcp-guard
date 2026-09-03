@@ -37,6 +37,13 @@ from .transport import Exchange, StdioClient, spawn
 
 PROTOCOL_VERSION = "2024-11-05"
 
+# How long to wait for a server to answer initialize. Servers that work answer
+# in milliseconds (measured RTTs on the corpus are 0.4-1.7ms); one that is
+# still silent after this is almost always missing configuration it never
+# announced. Figma-Context-MCP starts, stays silent because it wants an API
+# key, and burned the full deadline on every scan.
+DEFAULT_HANDSHAKE_TIMEOUT = 10.0
+
 
 @dataclass
 class ServerState:
@@ -326,7 +333,8 @@ def _build_for(info, candidate, *, timeout, sandbox, artifacts):
     return None
 
 
-async def _try_one(info, candidate, *, sandbox, timeout, artifacts):
+async def _try_one(info, candidate, *, sandbox, timeout, artifacts,
+                   handshake_timeout=DEFAULT_HANDSHAKE_TIMEOUT):
     """Launch one candidate and handshake. Returns HarnessResult."""
     root = info.root
     argv = list(candidate.argv)
@@ -386,7 +394,7 @@ async def _try_one(info, candidate, *, sandbox, timeout, artifacts):
         "initialize",
         {"protocolVersion": PROTOCOL_VERSION, "capabilities": {},
          "clientInfo": {"name": "mcp-guard", "version": "2.0.0"}},
-        timeout=min(15.0, float(timeout)),
+        timeout=min(float(handshake_timeout), float(timeout)),
     )
     rtt_ms = (time.perf_counter() - t0) * 1000
     state.init_exchange = init
@@ -401,8 +409,13 @@ async def _try_one(info, candidate, *, sandbox, timeout, artifacts):
         tail = client.stderr_tail(20)
         rc = proc.returncode
         await shutdown(client)
-        return fail("handshake failed: no answer to initialize within the deadline",
-                    exit_code=rc, stderr_tail=tail)
+        return fail(
+            f"handshake failed: no answer to initialize within "
+            f"{min(float(handshake_timeout), float(timeout)):.0f}s. The process "
+            f"is running but silent, which usually means it needs "
+            f"configuration it did not announce (an API key, a database URL). "
+            f"Raise --handshake-timeout if the server is simply slow to boot.",
+            exit_code=rc, stderr_tail=tail)
     if init.transport_error:
         tail = client.stderr_tail(20)
         rc = proc.returncode
@@ -452,7 +465,8 @@ async def _try_one(info, candidate, *, sandbox, timeout, artifacts):
     )
 
 
-async def launch_and_handshake(info, *, sandbox, timeout, artifacts=None):
+async def launch_and_handshake(info, *, sandbox, timeout, artifacts=None,
+                               handshake_timeout=DEFAULT_HANDSHAKE_TIMEOUT):
     """Try every derived candidate in order until one handshakes.
 
     The audited version had a single guessed command and gave up. Candidates
@@ -474,7 +488,8 @@ async def launch_and_handshake(info, *, sandbox, timeout, artifacts=None):
     last_artifacts = {}
     for cand in candidates[:6]:
         result = await _try_one(info, cand, sandbox=sandbox, timeout=timeout,
-                                artifacts=art)
+                                artifacts=art,
+                                handshake_timeout=handshake_timeout)
         attempts.append({
             "source": cand.source,
             "argv": " ".join(cand.argv),

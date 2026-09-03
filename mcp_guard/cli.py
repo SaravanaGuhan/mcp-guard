@@ -61,6 +61,19 @@ def build_parser() -> argparse.ArgumentParser:
              "the derived candidate chain is printed in stage artifacts.",
     )
     ex.add_argument(
+        "--probe-budget", type=float, default=30.0,
+        help="seconds of dynamic probing before remaining probes are skipped "
+             "(default: 30). Probes a server answers slowly -- a tool that "
+             "makes a network call, say -- can otherwise dominate a scan. "
+             "Anything skipped is named in the report.",
+    )
+    ex.add_argument(
+        "--handshake-timeout", type=float, default=10.0,
+        help="seconds to wait for a server to answer initialize "
+             "(default: 10). A server that is running but silent past this "
+             "usually needs configuration it did not announce.",
+    )
+    ex.add_argument(
         "--timeout", type=int, default=120,
         help="per-subprocess timeout in seconds (default: 120)",
     )
@@ -131,6 +144,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             use_cache=not args.no_cache,
             entrypoint=args.entrypoint,
             progress=not args.quiet,
+            probe_budget=args.probe_budget,
+            handshake_timeout=args.handshake_timeout,
         )
 
         acq = result.status("acquire")

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
+import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -98,9 +99,14 @@ async def _confirm_alive(client: StdioClient, timeout: float = 2.0) -> bool:
     return client.alive
 
 
+DEFAULT_PROBE_BUDGET = 30.0
+
+
 async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
                       base_timeout: float, rtt_ms: float,
-                      window: int = 4) -> List[Finding]:
+                      window: int = 4,
+                      budget_s: float = DEFAULT_PROBE_BUDGET,
+                      report: Optional[Dict[str, Any]] = None) -> List[Finding]:
     """Run the probe set, pipelining what is safe to pipeline.
 
     JSON-RPC permits several in-flight requests with distinct ids, and the
@@ -112,6 +118,17 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
     findings: List[Finding] = []
     seen: set = set()
     dead = False
+
+    # A real server's tools do real work: an Airbnb search tool makes an HTTP
+    # request, and a probe against it waits out the full ceiling. Measured,
+    # probing mcp-server-airbnb spent 35.5s of a 46s dynamic stage inside
+    # tools/call. The budget bounds that, and what it skipped is reported --
+    # an unrun probe is stated, never assumed negative.
+    started = time.monotonic()
+    skipped: List[str] = []
+
+    def out_of_budget() -> bool:
+        return (time.monotonic() - started) > budget_s
 
     def record(probe, req, ex, why):
         key = (probe.rule_id, probe.id)
@@ -132,6 +149,9 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
             continue
         if probe.id == "undeclared-method-exposure" and not ctx.dispatch_ok:
             continue
+        if out_of_budget():
+            skipped.append(probe.id)
+            continue
 
         try:
             requests = probe.build_requests(state, ctx)
@@ -145,6 +165,9 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
         # ---- serial path: crash probes need clean attribution ----
         if probe.watch_exit:
             for req in requests:
+                if out_of_budget():
+                    skipped.append(f"{probe.id} (budget)")
+                    break
                 if not await _confirm_alive(client, timeout=max(0.5, timeout)):
                     dead = True
                     break
@@ -180,6 +203,9 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
 
         results = []
         for i in range(0, len(requests), window):
+            if out_of_budget():
+                skipped.append(f"{probe.id} ({len(requests) - i} requests)")
+                break
             chunk = requests[i:i + window]
             sent = [_send(client, probe, r, timeout) for r in chunk]
             try:
@@ -215,11 +241,16 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
 
             record(probe, req, ex, why)
 
+    if report is not None and skipped:
+        report["probes_skipped_budget"] = sorted(set(skipped))
+        report["probe_budget_s"] = budget_s
     return findings
 
 
 async def _run_async(info: ServerInfo, sandbox: str, timeout: int,
-                     skip_install: bool) -> Tuple[List[Finding], Dict[str, Any]]:
+                     skip_install: bool, probe_budget: float,
+                     handshake_timeout: float
+                     ) -> Tuple[List[Finding], Dict[str, Any]]:
     art: Dict[str, Any] = {}
     fail = prepare(info, sandbox=sandbox, timeout=timeout,
                    skip_install=skip_install, artifacts=art)
@@ -227,7 +258,8 @@ async def _run_async(info: ServerInfo, sandbox: str, timeout: int,
         return [], dict(art, ran=False, reason=fail)
 
     h = await launch_and_handshake(info, sandbox=sandbox, timeout=timeout,
-                                   artifacts=art)
+                                   artifacts=art,
+                                   handshake_timeout=handshake_timeout)
     if not h.ran:
         meta: Dict[str, Any] = {"ran": False, "reason": h.reason}
         meta.update(h.artifacts)
@@ -239,10 +271,14 @@ async def _run_async(info: ServerInfo, sandbox: str, timeout: int,
 
     try:
         rtt = getattr(h.state, "handshake_rtt_ms", 0.0)
+        probe_report: Dict[str, Any] = {}
         findings = await _run_probes(h.client, h.state, ctx,
-                                     float(min(timeout, 10)), rtt)
+                                     float(min(timeout, 10)), rtt,
+                                     budget_s=probe_budget,
+                                     report=probe_report)
         meta = {"ran": True, "probes_run": len(ALL_PROBES),
                 "handshake_rtt_ms": round(rtt, 1)}
+        meta.update(probe_report)
         meta.update(h.artifacts)
         meta["stderr_tail"] = h.client.stderr_tail(20)
         return findings, meta
@@ -255,14 +291,18 @@ async def _run_async(info: ServerInfo, sandbox: str, timeout: int,
 
 
 def run_dynamic(info: ServerInfo, *, sandbox: str = "none", timeout: int = 120,
-                skip_install: bool = False) -> Tuple[List[Finding], Dict[str, Any]]:
+                skip_install: bool = False,
+                probe_budget: float = DEFAULT_PROBE_BUDGET,
+                handshake_timeout: float = 10.0
+                ) -> Tuple[List[Finding], Dict[str, Any]]:
     if os.name == "nt":
         try:
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         except AttributeError:  # pragma: no cover
             pass
     try:
-        return asyncio.run(_run_async(info, sandbox, timeout, skip_install))
+        return asyncio.run(_run_async(info, sandbox, timeout, skip_install,
+                                      probe_budget, handshake_timeout))
     except Exception as exc:  # noqa: BLE001
         return [], {"ran": False,
                     "reason": f"dynamic analysis error: {type(exc).__name__}: {exc}"}

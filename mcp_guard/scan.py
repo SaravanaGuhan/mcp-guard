@@ -83,6 +83,8 @@ def run_scan(
     use_cache: bool = True,
     entrypoint: Optional[str] = None,
     progress: bool = False,
+    probe_budget: float = 30.0,
+    handshake_timeout: float = 10.0,
 ) -> tuple[ScanResult, Optional[Acquired]]:
     _PROGRESS["on"] = progress
     result = ScanResult(
@@ -203,7 +205,9 @@ def run_scan(
         else:
             from .dynamic import run_dynamic
             found, meta = run_dynamic(info, sandbox=sandbox, timeout=timeout,
-                                      skip_install=skip_install)
+                                      skip_install=skip_install,
+                                      probe_budget=probe_budget,
+                                      handshake_timeout=handshake_timeout)
             if meta.get("ran"):
                 result.findings.extend(found)
                 st.done(**{k: v for k, v in meta.items() if k != "ran"})

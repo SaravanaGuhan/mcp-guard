@@ -198,7 +198,16 @@ def _member_candidates(root: str, members: List[str]) -> List[LaunchCandidate]:
 
 
 def _apply_candidates(info: ServerInfo, cands: List[LaunchCandidate]) -> None:
-    """Record the chain and adopt the first candidate as the launch command."""
+    """Record the chain and adopt the first candidate as the launch command.
+
+    Candidates are ordered by cost, not just by declaration order: anything
+    already runnable is tried before anything that needs a build. Measured on
+    Figma-Context-MCP, the declaration order spent 8.8s building before
+    reaching a candidate that did not need one.
+
+    Within each group the original order is preserved, so bin still beats main
+    still beats scripts.start.
+    """
     # de-duplicate on argv, keeping the earliest source
     seen, unique = set(), []
     for c in cands:
@@ -207,6 +216,8 @@ def _apply_candidates(info: ServerInfo, cands: List[LaunchCandidate]) -> None:
             continue
         seen.add(key)
         unique.append(c)
+
+    unique.sort(key=lambda c: 1 if c.requires_build else 0)
     info.launch_candidates = unique
     if unique:
         first = unique[0]

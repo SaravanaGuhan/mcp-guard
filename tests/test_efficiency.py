@@ -430,3 +430,79 @@ def test_console_filter_narrows_and_counts_suppressed():
     shown, suppressed = filter_findings(
         findings, include_transitive=True, include_dev=True, min_severity="low")
     assert len(shown) == 4 and suppressed == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase I: bounding the dynamic stage
+# ---------------------------------------------------------------------------
+
+
+def test_candidates_that_need_a_build_are_tried_last(tmp_path):
+    """Never pay for a build when something runnable already exists."""
+    from mcp_guard.detect import detect
+
+    (tmp_path / "ready.js").write_text("//", encoding="utf-8")
+    (tmp_path / "package.json").write_text(json.dumps({
+        "name": "x",
+        # bin is declared FIRST but needs a build; main is ready to run.
+        "bin": "dist/cli.js",
+        "main": "ready.js",
+        "scripts": {"build": "tsc"},
+        "dependencies": {"mcp-server": "1"},
+    }), encoding="utf-8")
+
+    cands = detect(str(tmp_path)).launch_candidates
+    assert len(cands) == 2
+    assert cands[0].requires_build is False
+    assert cands[0].argv == ["node", "ready.js"]
+    assert cands[1].requires_build is True
+
+
+def test_cost_ordering_preserves_declaration_order_within_a_group(tmp_path):
+    from mcp_guard.detect import detect
+
+    for f in ("a.js", "b.js"):
+        (tmp_path / f).write_text("//", encoding="utf-8")
+    (tmp_path / "package.json").write_text(json.dumps({
+        "name": "x", "bin": "a.js", "main": "b.js",
+        "dependencies": {"mcp-server": "1"}}), encoding="utf-8")
+    cands = detect(str(tmp_path)).launch_candidates
+    assert [c.source for c in cands] == ["package.json bin",
+                                         "package.json main"]
+
+
+def test_probe_budget_stops_probing_and_says_what_it_skipped():
+    """An unrun probe must be reported, never assumed negative."""
+    r = run_scan_fresh("vulnerable-server", allow_execute=True,
+                       skip_install=True, static_enabled=False,
+                       probe_budget=0.0)
+    st = r.status("dynamic")
+    assert st.ran is True, st.reason
+    skipped = st.artifacts.get("probes_skipped_budget")
+    assert skipped, "budget of 0s should skip probes and record them"
+    assert st.artifacts.get("probe_budget_s") == 0.0
+
+
+def test_generous_budget_changes_nothing():
+    """The budget must not alter findings when it is not reached."""
+    tight = run_scan_fresh("vulnerable-server", allow_execute=True,
+                           skip_install=True, static_enabled=False,
+                           probe_budget=300.0)
+    assert {f.rule_id for f in tight.findings} == {
+        "MCPG-DYN-CMDEXEC", "MCPG-DYN-PATHTRAVERSAL"}
+    assert "probes_skipped_budget" not in tight.status("dynamic").artifacts
+
+
+def test_handshake_timeout_is_honoured_and_explained():
+    """A server that starts but never answers must fail fast, with a reason."""
+    import time as _time
+
+    t0 = _time.time()
+    r = run_scan_fresh("always-error-live", allow_execute=True,
+                       skip_install=True, static_enabled=False,
+                       handshake_timeout=1.0)
+    elapsed = _time.time() - t0
+    st = r.status("dynamic")
+    assert st.ran is False
+    assert elapsed < 30, f"handshake timeout not honoured ({elapsed:.1f}s)"
+    assert r.findings == []
