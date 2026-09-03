@@ -7,6 +7,7 @@ stage's output, and no finding is relabelled across stages.
 
 from __future__ import annotations
 
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -16,6 +17,15 @@ from . import __version__
 from .acquire import AcquireError, Acquired, acquire
 from .detect import detect
 from .models import Finding, ScanResult, ScanStatus
+
+
+_PROGRESS = {"on": False}
+
+
+def _progress(message: str) -> None:
+    """Progress goes to stderr so it never contaminates a piped report."""
+    if _PROGRESS["on"]:
+        print(f"mcp-guard: {message}", file=sys.stderr, flush=True)
 
 
 class Stage:
@@ -31,6 +41,7 @@ class Stage:
 
     def __enter__(self) -> "Stage":
         self.t0 = time.time()
+        _progress(f"{self.name} ...")
         return self
 
     def skip(self, reason: str) -> None:
@@ -45,6 +56,10 @@ class Stage:
         if exc_type is not None:
             self.ran = False
             self.reason = f"{exc_type.__name__}: {exc}"
+        _progress(
+            f"{self.name} {'done' if self.ran else 'skipped'} "
+            f"in {time.time() - self.t0:.1f}s"
+            + (f" -- {self.reason}" if not self.ran and self.reason else ""))
         self.result.set_status(ScanStatus(
             stage=self.name,
             ran=self.ran,
@@ -67,7 +82,9 @@ def run_scan(
     skip_install: bool = False,
     use_cache: bool = True,
     entrypoint: Optional[str] = None,
+    progress: bool = False,
 ) -> tuple[ScanResult, Optional[Acquired]]:
+    _PROGRESS["on"] = progress
     result = ScanResult(
         target=target,
         tool_version=__version__,

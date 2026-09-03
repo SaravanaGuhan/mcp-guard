@@ -21,6 +21,27 @@ from ..models import (
 BAR = "=" * 78
 SUB = "-" * 78
 
+# How many extra locations to list before pointing at the JSON report.
+MAX_LOCATIONS = 8
+
+
+def _location(f: Finding) -> str:
+    ev = f.evidence
+    if isinstance(ev, StaticEvidence):
+        return f"{ev.file}:{ev.line}"
+    if isinstance(ev, DependencyEvidence):
+        return f"{ev.package} {ev.installed_version}"
+    if isinstance(ev, DynamicEvidence):
+        return ev.oracle_id
+    return "?"
+
+
+def _location_key(f: Finding):
+    ev = f.evidence
+    if isinstance(ev, StaticEvidence):
+        return (ev.file, ev.line)
+    return (_location(f), 0)
+
 
 def _redact(secret: str) -> str:
     s = secret.strip()
@@ -116,18 +137,41 @@ def render(result: ScanResult, shown=None, suppressed: int = 0) -> str:
         L.append("  No findings. Note which stages ran above before reading this")
         L.append("  as 'clean'.")
     else:
-        ordered = sorted(findings, key=lambda f: (-f.cvss_score, f.rule_id))
-        for i, f in enumerate(ordered, 1):
+        # Group repeated hits of the same rule. Twelve instances of one rule
+        # across a repo is one problem with twelve locations, not twelve
+        # entries to scroll past.
+        groups: dict = {}
+        for f in findings:
+            groups.setdefault(f.rule_id, []).append(f)
+        ordered_groups = sorted(
+            groups.values(), key=lambda g: (-max(x.cvss_score for x in g),
+                                            g[0].rule_id))
+
+        for i, group in enumerate(ordered_groups, 1):
+            head = max(group, key=lambda f: f.cvss_score)
+            n = len(group)
             L.append(
-                f"  [{i}] {f.severity.value.upper():<8} {f.cvss_score:4.1f}  "
-                f"{f.rule_id}"
+                f"  [{i}] {head.severity.value.upper():<8} {head.cvss_score:4.1f}  "
+                f"{head.rule_id}" + (f"   ({n} occurrences)" if n > 1 else "")
             )
-            L.append(f"      {f.title}")
-            L.append(f"      cwe: {f.cwe}   vector: {f.cvss_vector}")
-            L.extend(_evidence_block(f))
-            if f.remediation:
-                for line in textwrap.wrap(f.remediation, 66):
-                    L.append(f"      fix: {line}" if line == textwrap.wrap(f.remediation, 66)[0]
+            L.append(f"      {head.title}")
+            L.append(f"      cwe: {head.cwe}   vector: {head.cvss_vector}")
+            L.extend(_evidence_block(head))
+
+            if n > 1:
+                L.append(f"      also at:")
+                for other in sorted(group, key=_location_key)[:MAX_LOCATIONS]:
+                    if other is head:
+                        continue
+                    L.append(f"        - {_location(other)}")
+                if n - 1 > MAX_LOCATIONS:
+                    L.append(f"        ... and {n - 1 - MAX_LOCATIONS} more "
+                             f"(all locations are in the JSON report)")
+
+            if head.remediation:
+                wrapped = textwrap.wrap(head.remediation, 66)
+                for line in wrapped:
+                    L.append(f"      fix: {line}" if line == wrapped[0]
                              else f"           {line}")
             L.append("")
 

@@ -172,3 +172,90 @@ def test_exit_two_on_evidence_violation(tmp_path, monkeypatch):
 
     monkeypatch.setattr("mcp_guard.cli.verify_result", boom)
     assert _cli([fixture_path("clean-server"), "--no-deps"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Phase H: ergonomics
+# ---------------------------------------------------------------------------
+
+
+def test_summary_format_fits_one_screen_and_names_skipped_stages():
+    from mcp_guard.report import summary
+
+    r = run_scan_on("vulnerable-server")
+    text = summary.render(r)
+    assert len(text.splitlines()) <= 30, "summary should fit one screen"
+    assert "MCP GUARD:" in text
+    assert "stages" in text
+    assert "dynamic" in text, "a skipped stage must still be named"
+    assert "top rules" in text
+
+
+def test_summary_says_no_findings_when_clean():
+    from mcp_guard.report import summary
+
+    text = summary.render(run_scan_on("clean-server"))
+    assert "NO FINDINGS" in text
+
+
+def test_summary_flags_critical():
+    from mcp_guard.report import summary
+
+    text = summary.render(run_scan_on("vulnerable-server"))
+    assert "CRITICAL FINDINGS" in text
+
+
+def test_console_groups_repeated_rule_hits():
+    """Twelve hits of one rule is one entry with locations, not twelve."""
+    from mcp_guard.models import Finding, ScanResult, ScanStatus, StaticEvidence
+    from mcp_guard.report import console
+    from mcp_guard.rules import get as get_rule
+
+    rule = get_rule("MCPG-JS-PATH-TAINT")
+    r = ScanResult(target="t", tool_version="test")
+    r.set_status(ScanStatus(stage="static", ran=True))
+    for i in range(1, 13):
+        r.findings.append(Finding(
+            rule_id=rule.id, title=rule.title, description="d", cwe=rule.cwe,
+            cvss_vector=rule.clean_vector, cvss_score=rule.score,
+            evidence=StaticEvidence(file=f"src/f{i}.js", line=i, column=1,
+                                    matched_source="fs.readFile(p)",
+                                    rule_id=rule.id)))
+
+    text = console.render(r)
+    assert text.count("[1]") == 1
+    assert "[2]" not in text, "12 hits of one rule must be a single entry"
+    assert "(12 occurrences)" in text
+    assert "also at:" in text
+    assert "src/f2.js:2" in text
+    assert "and 3 more" in text, "should cap the location list and say so"
+
+
+def test_console_progress_is_not_in_the_report_body():
+    """Progress goes to stderr so a piped report stays clean."""
+    from mcp_guard.report import console
+
+    text = console.render(run_scan_on("clean-server"))
+    assert "mcp-guard:" not in text
+
+
+def test_severity_floor_applies_to_all_finding_kinds():
+    from mcp_guard.deps import filter_findings
+    from mcp_guard.models import Finding, StaticEvidence
+    from mcp_guard.rules import get as get_rule
+
+    low = get_rule("MCPG-DOCKER-CHMOD777")     # 4.8, medium
+    high = get_rule("MCPG-JS-SHELL-TAINT")     # 9.4, critical
+
+    def mk(rule):
+        return Finding(
+            rule_id=rule.id, title=rule.title, description="d", cwe=rule.cwe,
+            cvss_vector=rule.clean_vector, cvss_score=rule.score,
+            evidence=StaticEvidence(file="a.js", line=1, column=1,
+                                    matched_source="x", rule_id=rule.id))
+
+    shown, suppressed = filter_findings(
+        [mk(low), mk(high)], include_transitive=True, include_dev=True,
+        min_severity="high")
+    assert [f.rule_id for f in shown] == [high.id]
+    assert suppressed == 1

@@ -18,6 +18,7 @@ from .models import Severity
 from .report import console as console_report
 from .report import json as json_report
 from .report import sarif as sarif_report
+from .report import summary as summary_report
 from .report.verify import EvidenceViolation, verify_result
 
 EXIT_CLEAN = 0
@@ -68,6 +69,10 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--no-static", action="store_true", help="skip static analysis")
     sc.add_argument("--no-deps", action="store_true", help="skip dependency analysis")
     sc.add_argument(
+        "--quiet", action="store_true",
+        help="suppress per-stage progress on stderr",
+    )
+    sc.add_argument(
         "--no-cache", action="store_true",
         help="do not read or write the static result cache (caching costs "
              "~25%% on a cold scan and saves ~87%% on a rescan)",
@@ -79,7 +84,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     out = p.add_argument_group("output")
     out.add_argument(
-        "--format", choices=("console", "json", "sarif"), default="console",
+        "--format", choices=("console", "json", "sarif", "summary"),
+        default="console",
     )
     out.add_argument("-o", "--output", help="write the report to this path")
     out.add_argument(
@@ -124,6 +130,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             skip_install=args.skip_install,
             use_cache=not args.no_cache,
             entrypoint=args.entrypoint,
+            progress=not args.quiet,
         )
 
         acq = result.status("acquire")
@@ -141,6 +148,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             text = json_report.render(result)
         elif args.format == "sarif":
             text = sarif_report.render(result)
+        elif args.format == "summary":
+            text = summary_report.render(result)
         else:
             from .deps import filter_findings
             shown, suppressed = filter_findings(

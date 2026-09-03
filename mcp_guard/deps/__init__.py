@@ -179,19 +179,23 @@ def run_dependencies(info: ServerInfo, *,
 def filter_findings(findings: List[Finding], *, include_transitive: bool,
                     include_dev: bool, min_severity: Optional[str]) -> Tuple[
                         List[Finding], int]:
-    """Console-side narrowing. The JSON report always carries everything."""
+    """Console-side narrowing. The JSON report always carries everything.
+
+    The severity floor applies to every finding, not only dependency ones: a
+    console report is for reading, and low-severity noise buries the two lines
+    that matter. Transitive/dev filtering is dependency-specific because only
+    dependency findings have that dimension.
+    """
+    floor = Severity(min_severity).rank if min_severity else -1
     keep: List[Finding] = []
     for f in findings:
-        if f.evidence.kind != "dependency":
-            keep.append(f)
+        if f.severity.rank < floor:
             continue
-        title = f.title
-        if not include_transitive and "(transitive" in title:
-            continue
-        if not include_dev and ", dev)" in title:
-            continue
-        if min_severity:
-            if f.severity.rank < Severity(min_severity).rank:
+        if f.evidence.kind == "dependency":
+            title = f.title
+            if not include_transitive and "(transitive" in title:
+                continue
+            if not include_dev and ", dev)" in title:
                 continue
         keep.append(f)
     return keep, len(findings) - len(keep)
