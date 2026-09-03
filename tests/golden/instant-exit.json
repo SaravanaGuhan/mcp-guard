@@ -1,0 +1,29 @@
+{
+  "finding_count": 0,
+  "findings": [],
+  "fixture": "instant-exit",
+  "is_mcp_server": true,
+  "server_type": "nodejs",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": false,
+      "reason": "server exited immediately with code 1 before any request was sent"
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}

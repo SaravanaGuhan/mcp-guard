@@ -1,0 +1,39 @@
+{
+  "finding_count": 1,
+  "findings": [
+    {
+      "cvss_score": 7.1,
+      "cvss_vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:P/VC:L/VI:H/VA:N/SC:L/SI:L/SA:N",
+      "evidence_kind": "static",
+      "file": "src/index.ts",
+      "line": 13,
+      "rule_id": "MCPG-MCP-PROMPT-INJECTION-SURFACE",
+      "severity": "high"
+    }
+  ],
+  "fixture": "ts-server",
+  "is_mcp_server": true,
+  "server_type": "nodejs",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": false,
+      "reason": "build failed (npm run build -> rc=1): 'tsc' is not recognized as an internal or external command,\noperable program or batch file."
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}

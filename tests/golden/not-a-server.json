@@ -1,0 +1,29 @@
+{
+  "finding_count": 0,
+  "findings": [],
+  "fixture": "not-a-server",
+  "is_mcp_server": false,
+  "server_type": "unknown",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": false,
+      "reason": "no launch command could be derived from target metadata (no package.json, pyproject.toml, requirements.txt, go.mod or Dockerfile found; target does not look like an MCP server)"
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}

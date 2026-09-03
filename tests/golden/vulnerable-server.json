@@ -1,0 +1,73 @@
+{
+  "finding_count": 5,
+  "findings": [
+    {
+      "cvss_score": 9.4,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H",
+      "evidence_kind": "dynamic",
+      "oracle_id": "cmd-injection-canary",
+      "rule_id": "MCPG-DYN-CMDEXEC",
+      "severity": "critical"
+    },
+    {
+      "cvss_score": 8.2,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:H/SI:N/SA:N",
+      "evidence_kind": "dynamic",
+      "oracle_id": "resource-traversal-canary",
+      "rule_id": "MCPG-DYN-PATHTRAVERSAL",
+      "severity": "high"
+    },
+    {
+      "cvss_score": 7.0,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:L/SI:N/SA:N",
+      "evidence_kind": "static",
+      "file": "index.js",
+      "line": 48,
+      "rule_id": "MCPG-JS-PATH-TAINT",
+      "severity": "high"
+    },
+    {
+      "cvss_score": 9.4,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H",
+      "evidence_kind": "static",
+      "file": "index.js",
+      "line": 39,
+      "rule_id": "MCPG-JS-SHELL-TAINT",
+      "severity": "critical"
+    },
+    {
+      "cvss_score": 8.8,
+      "cvss_vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:N/SI:N/SA:N",
+      "evidence_kind": "static",
+      "file": "index.js",
+      "line": 12,
+      "rule_id": "MCPG-SECRET-HARDCODED",
+      "severity": "high"
+    }
+  ],
+  "fixture": "vulnerable-server",
+  "is_mcp_server": true,
+  "server_type": "nodejs",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": true,
+      "reason": null
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}

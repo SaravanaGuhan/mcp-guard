@@ -1,0 +1,48 @@
+{
+  "finding_count": 2,
+  "findings": [
+    {
+      "cvss_score": 4.8,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:L/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N",
+      "evidence_kind": "static",
+      "file": "Dockerfile",
+      "line": 4,
+      "rule_id": "MCPG-DOCKER-CHMOD777",
+      "severity": "medium"
+    },
+    {
+      "cvss_score": 5.1,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:L/SI:L/SA:L",
+      "evidence_kind": "static",
+      "file": "Dockerfile",
+      "line": 2,
+      "rule_id": "MCPG-DOCKER-ROOT",
+      "severity": "medium"
+    }
+  ],
+  "fixture": "docker-server",
+  "is_mcp_server": false,
+  "server_type": "docker",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": false,
+      "reason": "no launch command could be derived from target metadata (docker targets are analysed statically; MCP Guard does not build or run target images)"
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "finding_count": 2,
+  "findings": [
+    {
+      "cvss_score": 7.0,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:L/SI:N/SA:N",
+      "evidence_kind": "static",
+      "file": "server.py",
+      "line": 20,
+      "rule_id": "MCPG-PY-PATH-TAINT",
+      "severity": "high"
+    },
+    {
+      "cvss_score": 9.4,
+      "cvss_vector": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H",
+      "evidence_kind": "static",
+      "file": "server.py",
+      "line": 13,
+      "rule_id": "MCPG-PY-SHELL-TAINT",
+      "severity": "critical"
+    }
+  ],
+  "fixture": "python-server",
+  "is_mcp_server": true,
+  "server_type": "python",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": false,
+      "reason": "server exited immediately with code 1 before any request was sent"
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}

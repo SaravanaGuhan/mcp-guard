@@ -24,3 +24,11 @@ bench:
 clean:
 	rm -rf .pytest_cache htmlcov .coverage
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
+
+golden:
+	$(PY) tools_golden.py
+	@echo "regenerated tests/golden/ -- justify every delta in the commit"
+
+profile:
+	$(PY) tools_profile.py > docs/profile-baseline.md
+	@echo "wrote docs/profile-baseline.md"

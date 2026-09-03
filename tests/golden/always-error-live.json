@@ -1,0 +1,29 @@
+{
+  "finding_count": 0,
+  "findings": [],
+  "fixture": "always-error-live",
+  "is_mcp_server": true,
+  "server_type": "nodejs",
+  "stages": {
+    "acquire": {
+      "ran": true,
+      "reason": null
+    },
+    "dependencies": {
+      "ran": false,
+      "reason": "disabled by --no-deps"
+    },
+    "detect": {
+      "ran": true,
+      "reason": null
+    },
+    "dynamic": {
+      "ran": false,
+      "reason": "handshake failed: server answered initialize with error {'code': -32601, 'message': 'Method not found'}"
+    },
+    "static": {
+      "ran": true,
+      "reason": null
+    }
+  }
+}
