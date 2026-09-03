@@ -8,7 +8,6 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Security Scanner](https://img.shields.io/badge/security-scanner-red.svg)](https://github.com/SaravanaGuhan/mcp-guard)
 [![CVSS v4.0](https://img.shields.io/badge/CVSS-v4.0-green.svg)](https://www.first.org/cvss/v4.0/)
-[![AIVSS](https://img.shields.io/badge/AIVSS-enabled-purple.svg)](https://github.com/SaravanaGuhan/mcp-guard)
 
 *The first open-source security scanner specifically designed for MCP servers*
 
@@ -26,7 +25,6 @@ MCP Guard is a comprehensive security assessment tool that identifies vulnerabil
 
 - **First-of-its-kind**: Purpose-built for MCP server security assessment
 - **Universal Support**: Works with Python, Node.js, Go, and Docker-based MCP servers
-- **Professional Scoring**: Implements both CVSS v4.0 and AIVSS (AI Vulnerability Scoring System)
 - **Production Ready**: Enterprise-grade features with comprehensive reporting
 
 ---
@@ -70,7 +68,6 @@ python mcp_scanner.py <repository-url>
 
 ### 📊 **Professional Scoring**
 - **CVSS v4.0**: Industry-standard vulnerability scoring
-- **AIVSS**: AI-specific vulnerability assessment
 - **Risk Analysis**: Business impact evaluation
 - **Remediation Prioritization**: Intelligent vulnerability ranking
 
@@ -174,7 +171,6 @@ graph TB
     D --> F[Vulnerability Scoring]
     E --> F
     F --> G[CVSS v4.0 Scoring]
-    F --> H[AIVSS Scoring]
     G --> I[Report Generation]
     H --> I
     I --> J[JSON/Console Output]
@@ -185,7 +181,6 @@ graph TB
 - **Repository Handler**: Downloads and analyzes repository structure
 - **Static Analysis Engine**: Pattern-based vulnerability detection
 - **Dynamic Analysis Engine**: Live server testing and fuzzing
-- **Vulnerability Scoring**: CVSS v4.0 and AIVSS implementation
 - **Report Generator**: Professional vulnerability reporting
 
 ---

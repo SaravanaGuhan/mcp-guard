@@ -41,7 +41,6 @@ mcp-guard/
 
 ### 3. **Advanced Vulnerability Scoring**
 - ✅ **CVSS v4.0 Implementation**: Latest vulnerability scoring standard
-- ✅ **AIVSS (AI Vulnerability Scoring System)**: First open-source implementation
 - ✅ **Risk Assessment**: Business impact analysis
 - ✅ **Remediation Prioritization**: Intelligent vulnerability ranking
 
@@ -101,7 +100,6 @@ mcp-guard/
 
 ### First-of-Its-Kind
 - **Pioneer in MCP Security**: First dedicated MCP security scanner
-- **AIVSS Implementation**: First open-source AI Vulnerability Scoring System
 - **CVSS v4.0 Support**: Early adopter of latest vulnerability scoring
 - **MCP Protocol Focus**: Specialized knowledge of MCP security patterns
 
