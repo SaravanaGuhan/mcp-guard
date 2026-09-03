@@ -16,6 +16,7 @@ import json
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -25,6 +26,7 @@ API = "https://api.osv.dev/v1/querybatch"
 API_VULN = "https://api.osv.dev/v1/vulns/"
 BATCH = 100
 PAUSE = 0.2
+VULN_WORKERS = 8
 TIMEOUT = 30
 RETRIES = 3
 
@@ -231,13 +233,30 @@ def query(purls: Sequence[str]) -> Dict[str, List[Advisory]]:
         payload = {"queries": [{"package": {"purl": p}} for p in chunk]}
         data = _post(payload)
         results = data.get("results") or []
+        # Fetch the full record for every advisory in this batch concurrently.
+        # These are independent GETs against the same host and were the
+        # dominant cost: a 551-package repo issued ~90 of them one at a time.
+        wanted = []
+        for res in results:
+            for stub in (res.get("vulns") or []):
+                vid = stub.get("id")
+                if vid:
+                    wanted.append(vid)
+        full_by_id: Dict[str, Any] = {}
+        if wanted:
+            uniq = list(dict.fromkeys(wanted))
+            with ThreadPoolExecutor(max_workers=min(VULN_WORKERS, len(uniq))) as ex:
+                for vid, data in zip(uniq, ex.map(_get_vuln, uniq)):
+                    if data is not None:
+                        full_by_id[vid] = data
+
         for purl, res in zip(chunk, results):
             advisories: List[Advisory] = []
             for stub in (res.get("vulns") or []):
                 vid = stub.get("id")
                 if not vid:
                     continue
-                full = _get_vuln(vid) or stub
+                full = full_by_id.get(vid) or stub
                 qual, vec = _severity(full)
                 base = purl.split("/", 1)[-1]
                 name, _, version = base.rpartition("@")

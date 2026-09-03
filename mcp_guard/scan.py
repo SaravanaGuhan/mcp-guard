@@ -8,6 +8,7 @@ stage's output, and no finding is relabelled across stages.
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -109,6 +110,38 @@ def run_scan(
         info.launch_argv = list(argv)
         info.entrypoint = f"--entrypoint: {entrypoint}"
 
+    # ---- dependencies start FIRST, on a thread -------------------------
+    #
+    # The dependency stage is network-bound (OSV) and static/dynamic are CPU-
+    # and subprocess-bound, so they overlap cleanly. Each stage still records
+    # its OWN wall time, not the overlap window: the worker times itself and
+    # the main thread only waits for the result.
+    deps_future = None
+    deps_pool: Optional[ThreadPoolExecutor] = None
+    deps_skip_reason: Optional[str] = None
+
+    if not deps_enabled:
+        deps_skip_reason = "disabled by --no-deps"
+    elif info is None:
+        deps_skip_reason = "detection did not complete"
+    elif offline:
+        deps_skip_reason = "offline mode: OSV lookup skipped"
+
+    if deps_skip_reason is None and info is not None:
+        def _deps_worker():
+            from .deps import run_dependencies
+            t0 = time.time()
+            art: dict = {}
+            try:
+                found = run_dependencies(info, artifacts=art)
+                return found, art, time.time() - t0, None
+            except Exception as exc:  # noqa: BLE001
+                return [], art, time.time() - t0, f"{type(exc).__name__}: {exc}"
+
+        deps_pool = ThreadPoolExecutor(max_workers=1,
+                                       thread_name_prefix="mcpguard-deps")
+        deps_future = deps_pool.submit(_deps_worker)
+
     # ---------------- static ----------------
     with Stage(result, "static") as st:
         if not static_enabled:
@@ -122,21 +155,6 @@ def run_scan(
                                               use_cache=use_cache)
             result.findings.extend(found)
             st.done(findings=len(found), **sart)
-
-    # ---------------- dependencies ----------------
-    with Stage(result, "dependencies") as st:
-        if not deps_enabled:
-            st.skip("disabled by --no-deps")
-        elif info is None:
-            st.skip("detection did not complete")
-        elif offline:
-            st.skip("offline mode: OSV lookup skipped")
-        else:
-            from .deps import run_dependencies
-            dart: dict = {}
-            found = run_dependencies(info, artifacts=dart)
-            result.findings.extend(found)
-            st.done(findings=len(found), **dart)
 
     # ---------------- dynamic ----------------
     with Stage(result, "dynamic") as st:
@@ -177,6 +195,22 @@ def run_scan(
                 st.artifacts.update(
                     {k: v for k, v in meta.items() if k not in ("ran", "reason")}
                 )
+
+    # ---------------- dependencies (join) ----------------
+    with Stage(result, "dependencies") as st:
+        if deps_future is None:
+            st.skip(deps_skip_reason or "dependency stage did not start")
+        else:
+            found, dart, own_seconds, err = deps_future.result()
+            if err:
+                st.skip(err)
+            else:
+                result.findings.extend(found)
+                st.done(findings=len(found), **dart)
+            # Report the worker's own wall time, not the overlap window.
+            st.t0 = time.time() - own_seconds
+    if deps_pool is not None:
+        deps_pool.shutdown(wait=True)
 
     result.finished_at = datetime.now(timezone.utc).isoformat()
     return result, acquired
