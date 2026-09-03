@@ -68,24 +68,66 @@ async def _send(client: StdioClient, probe: Probe, req: Dict[str, Any],
 
 
 
-async def _confirm_alive(client: StdioClient) -> bool:
+def probe_timeout(probe, rtt_ms: float) -> float:
+    """Per-probe deadline derived from the observed handshake round trip.
+
+    A server that answers initialize in 4ms does not need an 8s budget for the
+    next request. The baseline spent 8 of clean-server's 10s waiting out fixed
+    timeouts on probes that expect no answer at all (jsonrpc-conformance
+    4,024ms over 5 sends, malformed-frame-crash 4,015ms over 5).
+
+    20x the handshake RTT with a 250ms floor absorbs ordinary jitter and a
+    cold first call; the probe's own declared timeout stays the ceiling, so a
+    slow server is never given less than before.
+    """
+    if rtt_ms <= 0:
+        return probe.timeout
+    derived = max(0.25, (rtt_ms * 20) / 1000.0)
+    return min(probe.timeout, derived)
+
+
+async def _confirm_alive(client: StdioClient, timeout: float = 2.0) -> bool:
     """Round-trip a ping. Any answer -- including -32601 -- proves the process
-    is still serving. Used to gate crash attribution."""
+    is still serving. Used once on transition, not before every probe."""
     if not client.alive:
         return False
-    ex = await client.request("ping", {}, timeout=2.0)
+    ex = await client.request("ping", {}, timeout=timeout)
     if ex.answered or ex.response_raw:
         return True
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.15)
     return client.alive
 
 
 async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
-                      timeout: float) -> List[Finding]:
+                      base_timeout: float, rtt_ms: float,
+                      window: int = 4) -> List[Finding]:
+    """Run the probe set, pipelining what is safe to pipeline.
+
+    JSON-RPC permits several in-flight requests with distinct ids, and the
+    transport correlates by id, so capability-gated probes are sent
+    concurrently with a bounded window. Probes with watch_exit=True stay
+    strictly serial: a crash has to be attributable to one frame, and
+    overlapping sends would make that ambiguous.
+    """
     findings: List[Finding] = []
     seen: set = set()
+    dead = False
+
+    def record(probe, req, ex, why):
+        key = (probe.rule_id, probe.id)
+        if key in seen or not why:
+            return
+        raw = ex.response_raw
+        if not raw:
+            return
+        seen.add(key)
+        findings.append(_finding(
+            probe.rule_id, ex, probe.id, why,
+            title_suffix=str(req.get("__label__") or "")))
 
     for probe in ALL_PROBES:
+        if dead:
+            break
         if probe.required_capability and not state.declares(probe.required_capability):
             continue
         if probe.id == "undeclared-method-exposure" and not ctx.dispatch_ok:
@@ -95,79 +137,83 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
             requests = probe.build_requests(state, ctx)
         except Exception:  # noqa: BLE001 - a bad builder must not kill the stage
             continue
+        if not requests:
+            continue
 
-        for req in requests:
-            if probe.watch_exit:
-                # Attribute a crash only to the frame that actually caused it.
-                # A process that died during an earlier probe may not have been
-                # reaped yet, so confirm liveness with a real round trip first.
-                if not await _confirm_alive(client):
+        timeout = min(base_timeout, probe_timeout(probe, rtt_ms))
+
+        # ---- serial path: crash probes need clean attribution ----
+        if probe.watch_exit:
+            for req in requests:
+                if not await _confirm_alive(client, timeout=max(0.5, timeout)):
+                    dead = True
                     break
-            elif not client.alive:
+                ctx.process_alive_before = True
+                ex = await _send(client, probe, req, timeout)
+                await asyncio.sleep(0.25)
+                ctx.process_alive_after = client.alive
+
+                probe_req = dict(req, __request_json__=ex.request_json)
+                try:
+                    why = probe.oracle(probe_req, ex, ctx)
+                except Exception:  # noqa: BLE001
+                    why = None
+                if why and not ex.response_raw:
+                    ex = Exchange(
+                        request_obj=ex.request_obj,
+                        request_json=ex.request_json,
+                        response_raw=(
+                            "<no response; process exited with code "
+                            + str(client.proc.returncode) + "> stderr tail:\n"
+                            + client.stderr_tail(20)),
+                        response_parsed=None)
+                record(probe, req, ex, why)
+                if not client.alive:
+                    dead = True
+                    break
+            continue
+
+        # ---- pipelined path ----
+        if not client.alive:
+            dead = True
+            break
+
+        results = []
+        for i in range(0, len(requests), window):
+            chunk = requests[i:i + window]
+            sent = [_send(client, probe, r, timeout) for r in chunk]
+            try:
+                exchanges = await asyncio.gather(*sent, return_exceptions=True)
+            except Exception:  # noqa: BLE001
                 break
-            ctx.process_alive_before = client.alive
+            for req, ex in zip(chunk, exchanges):
+                if isinstance(ex, BaseException):
+                    continue
+                results.append((req, ex))
+            if not client.alive:
+                dead = True
+                break
+
+        for req, ex in results:
             ctx.extra["tool_name"] = req.get("__tool__")
             ctx.extra["schema_violation"] = req.get("__violation__")
-
-            ex = await _send(client, probe, req, min(timeout, probe.timeout))
-            # give a crashing process a moment to actually die
-            if probe.watch_exit:
-                await asyncio.sleep(0.3)
-            ctx.process_alive_after = client.alive
-
-            probe_req = dict(req)
-            probe_req["__request_json__"] = ex.request_json
-
+            probe_req = dict(req, __request_json__=ex.request_json)
             try:
                 why = probe.oracle(probe_req, ex, ctx)
             except Exception:  # noqa: BLE001
                 why = None
 
             if probe.id == "random-method-control":
-                # This probe's job is to set the gate.
                 if why:
                     ctx.dispatch_ok = False
-                    if ex.response_raw:
-                        findings.append(_finding(
-                            probe.rule_id, ex, probe.id, why))
+                    record(probe, req, ex, why)
                 else:
                     ctx.dispatch_ok = (
                         ex.error_code() == JSONRPC_METHOD_NOT_FOUND
-                        or not ex.answered
-                    )
+                        or not ex.answered)
                 continue
 
-            if not why:
-                continue
-
-            # A finding needs bytes. oracle_crash proves itself by process exit,
-            # so it is allowed to use the last thing the server said instead.
-            raw = ex.response_raw
-            if not raw and probe.id == "malformed-frame-crash":
-                raw = (
-                    f"<no response; process exited with code "
-                    f"{client.proc.returncode}> stderr tail:\n"
-                    + client.stderr_tail(20)
-                )
-                ex = Exchange(request_obj=ex.request_obj,
-                              request_json=ex.request_json,
-                              response_raw=raw,
-                              response_parsed=None)
-            if not ex.response_raw:
-                continue
-
-            # One finding per rule per probe: four traversal URIs proving the
-            # same escape are one vulnerability, not four.
-            key = (probe.rule_id, probe.id)
-            if key in seen:
-                continue
-            seen.add(key)
-            findings.append(_finding(
-                probe.rule_id, ex, probe.id, why,
-                title_suffix=str(req.get("__label__") or "")))
-
-            if probe.id == "malformed-frame-crash" and not client.alive:
-                break
+            record(probe, req, ex, why)
 
     return findings
 
@@ -192,8 +238,11 @@ async def _run_async(info: ServerInfo, sandbox: str, timeout: int,
     ctx = make_context(canary_path, canary_content, h.state.declared_methods())
 
     try:
-        findings = await _run_probes(h.client, h.state, ctx, float(min(timeout, 10)))
-        meta = {"ran": True, "probes_run": len(ALL_PROBES)}
+        rtt = getattr(h.state, "handshake_rtt_ms", 0.0)
+        findings = await _run_probes(h.client, h.state, ctx,
+                                     float(min(timeout, 10)), rtt)
+        meta = {"ran": True, "probes_run": len(ALL_PROBES),
+                "handshake_rtt_ms": round(rtt, 1)}
         meta.update(h.artifacts)
         meta["stderr_tail"] = h.client.stderr_tail(20)
         return findings, meta

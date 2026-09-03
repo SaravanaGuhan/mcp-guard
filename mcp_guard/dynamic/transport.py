@@ -75,7 +75,15 @@ class Exchange:
 
 
 class StdioClient:
-    """Line-delimited JSON-RPC 2.0 over a child process's stdin/stdout."""
+    """Line-delimited JSON-RPC 2.0 over a child process's stdin/stdout.
+
+    A single background reader owns stdout and dispatches each line to the
+    future waiting on that request id. That is what makes pipelining safe: with
+    several requests in flight, no coroutine can consume an answer belonging to
+    another one. Responses whose id nobody is waiting for (including the
+    ``id: null`` a server returns for a parse error) go to a loose queue that a
+    waiter with no expected id can consume.
+    """
 
     def __init__(self, proc: asyncio.subprocess.Process):
         self.proc = proc
@@ -83,6 +91,10 @@ class StdioClient:
         self.notifications: List[str] = []
         self.stderr_lines: List[str] = []
         self._stderr_task: Optional[asyncio.Task] = None
+        self._reader_task: Optional[asyncio.Task] = None
+        self._pending: Dict[Any, asyncio.Future] = {}
+        self._loose: "asyncio.Queue[tuple]" = asyncio.Queue()
+        self._stdout_closed = False
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -97,11 +109,50 @@ class StdioClient:
                 if not line:
                     return
                 self.stderr_lines.append(
-                    line.decode("utf-8", errors="replace").rstrip("\r\n")
-                )
+                    line.decode("utf-8", errors="replace").rstrip("\r\n"))
                 del self.stderr_lines[:-500]
 
         self._stderr_task = asyncio.ensure_future(pump())
+        self._reader_task = asyncio.ensure_future(self._read_loop())
+
+    async def _read_loop(self) -> None:
+        assert self.proc.stdout is not None
+        while True:
+            try:
+                line = await self.proc.stdout.readline()
+            except Exception:
+                break
+            if not line:
+                self._stdout_closed = True
+                break
+            text = line.decode("utf-8", errors="replace")
+            if not text.strip():
+                continue
+
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                # Non-JSON on stdout is itself an observation.
+                await self._loose.put((text, None))
+                continue
+
+            if isinstance(parsed, dict) and "id" not in parsed and "method" in parsed:
+                self.notifications.append(text.strip())
+                continue
+
+            rid = parsed.get("id") if isinstance(parsed, dict) else None
+            fut = self._pending.pop(rid, None)
+            if fut is not None and not fut.done():
+                fut.set_result((text, parsed if isinstance(parsed, dict) else None))
+            else:
+                await self._loose.put(
+                    (text, parsed if isinstance(parsed, dict) else None))
+
+        # Wake anything still waiting.
+        for fut in list(self._pending.values()):
+            if not fut.done():
+                fut.cancel()
+        self._pending.clear()
 
     def stderr_tail(self, n: int = 20) -> str:
         return "\n".join(self.stderr_lines[-n:])
@@ -117,13 +168,6 @@ class StdioClient:
         self._next_id += 1
         return i
 
-    async def _read_line(self, timeout: float) -> Optional[bytes]:
-        assert self.proc.stdout is not None
-        try:
-            return await asyncio.wait_for(self.proc.stdout.readline(), timeout)
-        except asyncio.TimeoutError:
-            return None
-
     async def request(
         self,
         method: str,
@@ -132,7 +176,6 @@ class StdioClient:
         timeout: float = 5.0,
         request_id: Optional[Any] = None,
     ) -> Exchange:
-        """Send a request and wait for the response with a matching id."""
         rid = self.next_id() if request_id is None else request_id
         obj: Dict[str, Any] = {"jsonrpc": "2.0", "id": rid, "method": method}
         if params is not None:
@@ -158,9 +201,7 @@ class StdioClient:
         timeout: float = 5.0,
         expect_id: Any = None,
     ) -> Exchange:
-        """Send a fully-formed object. Used by probes that need bad frames."""
-        request_json = json.dumps(obj)
-        return await self.send_raw(request_json, obj, timeout=timeout,
+        return await self.send_raw(json.dumps(obj), obj, timeout=timeout,
                                    expect_id=expect_id)
 
     async def send_raw(
@@ -171,62 +212,52 @@ class StdioClient:
         timeout: float = 5.0,
         expect_id: Any = None,
     ) -> Exchange:
-        """Send literal text. Used for malformed-JSON probes."""
+        """Send and await the correlated answer.
+
+        Safe to call concurrently: each call registers its own future before
+        writing, so answers cannot be stolen by a sibling request.
+        """
         ex = Exchange(request_obj=request_obj or {}, request_json=request_json)
         if not self.alive:
             ex.transport_error = f"process already exited rc={self.proc.returncode}"
             return ex
+
+        loop = asyncio.get_event_loop()
+        fut: Optional[asyncio.Future] = None
+        if expect_id is not None:
+            fut = loop.create_future()
+            self._pending[expect_id] = fut
+
         try:
             await self._write(request_json)
         except Exception as exc:  # noqa: BLE001
+            if expect_id is not None:
+                self._pending.pop(expect_id, None)
             ex.transport_error = f"write failed: {exc}"
             return ex
 
-        deadline = asyncio.get_event_loop().time() + timeout
-        while True:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                ex.timed_out = True
-                return ex
-            line = await self._read_line(remaining)
-            if line is None:
-                ex.timed_out = True
-                return ex
-            if line == b"":
+        try:
+            if fut is not None:
+                text, parsed = await asyncio.wait_for(fut, timeout)
+            else:
+                text, parsed = await asyncio.wait_for(self._loose.get(), timeout)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            if expect_id is not None:
+                self._pending.pop(expect_id, None)
+            if self._stdout_closed and not self.alive:
                 ex.transport_error = "stdout closed"
-                return ex
-
-            text = line.decode("utf-8", errors="replace")
-            if not text.strip():
-                continue
-
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError:
-                # Non-JSON on stdout is itself an observation; record it and stop.
-                ex.response_raw = text
-                ex.response_parsed = None
-                return ex
-
-            if isinstance(parsed, dict) and "id" not in parsed and "method" in parsed:
-                # Unsolicited notification: log, do not treat as an answer.
-                self.notifications.append(text.strip())
-                continue
-
-            if expect_id is not None and isinstance(parsed, dict):
-                if parsed.get("id") != expect_id:
-                    # Answer to something else, or a bad id. Record it only if we
-                    # never get the right one; keep waiting for our id.
-                    self.notifications.append(text.strip())
-                    continue
-
-            ex.response_raw = text
-            ex.response_parsed = parsed if isinstance(parsed, dict) else None
+            else:
+                ex.timed_out = True
             return ex
 
+        ex.response_raw = text
+        ex.response_parsed = parsed
+        return ex
+
     async def close(self) -> None:
-        if self._stderr_task:
-            self._stderr_task.cancel()
+        for task in (self._stderr_task, self._reader_task):
+            if task:
+                task.cancel()
         try:
             if self.proc.stdin and not self.proc.stdin.is_closing():
                 self.proc.stdin.close()
