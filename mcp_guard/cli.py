@@ -54,6 +54,12 @@ def build_parser() -> argparse.ArgumentParser:
              "already exists)",
     )
     ex.add_argument(
+        "--entrypoint",
+        help="launch this instead of the derived command, e.g. "
+             "'node dist/server.js'. Use when derivation misses a server; "
+             "the derived candidate chain is printed in stage artifacts.",
+    )
+    ex.add_argument(
         "--timeout", type=int, default=120,
         help="per-subprocess timeout in seconds (default: 120)",
     )
@@ -96,6 +102,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             offline=args.offline,
             timeout=args.timeout,
             skip_install=args.skip_install,
+            entrypoint=args.entrypoint,
         )
 
         acq = result.status("acquire")

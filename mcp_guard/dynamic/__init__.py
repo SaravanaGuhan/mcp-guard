@@ -174,12 +174,14 @@ async def _run_probes(client: StdioClient, state, ctx: ProbeContext,
 
 async def _run_async(info: ServerInfo, sandbox: str, timeout: int,
                      skip_install: bool) -> Tuple[List[Finding], Dict[str, Any]]:
+    art: Dict[str, Any] = {}
     fail = prepare(info, sandbox=sandbox, timeout=timeout,
-                   skip_install=skip_install)
+                   skip_install=skip_install, artifacts=art)
     if fail:
-        return [], {"ran": False, "reason": fail}
+        return [], dict(art, ran=False, reason=fail)
 
-    h = await launch_and_handshake(info, sandbox=sandbox, timeout=timeout)
+    h = await launch_and_handshake(info, sandbox=sandbox, timeout=timeout,
+                                   artifacts=art)
     if not h.ran:
         meta: Dict[str, Any] = {"ran": False, "reason": h.reason}
         meta.update(h.artifacts)

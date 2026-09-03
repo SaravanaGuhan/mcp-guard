@@ -64,6 +64,7 @@ def run_scan(
     offline: bool = False,
     timeout: int = 120,
     skip_install: bool = False,
+    entrypoint: Optional[str] = None,
 ) -> tuple[ScanResult, Optional[Acquired]]:
     result = ScanResult(
         target=target,
@@ -95,6 +96,17 @@ def run_scan(
         )
 
     info = result.server_info
+
+    if entrypoint and info is not None:
+        from .models import LaunchCandidate
+        argv = entrypoint.split() if " " in entrypoint else None
+        if argv is None:
+            argv = (["python", entrypoint] if entrypoint.endswith(".py")
+                    else ["node", entrypoint])
+        override = LaunchCandidate("--entrypoint override", argv)
+        info.launch_candidates = [override] + list(info.launch_candidates)
+        info.launch_argv = list(argv)
+        info.entrypoint = f"--entrypoint: {entrypoint}"
 
     # ---------------- static ----------------
     with Stage(result, "static") as st:
@@ -128,9 +140,27 @@ def run_scan(
             st.skip("requires --allow-execute")
         elif info is None:
             st.skip("detection did not complete")
+        elif info.server_type == "docker":
+            st.skip(
+                "Docker targets are analysed statically only: MCP Guard reads "
+                "the Dockerfile and does not build or run target images. See "
+                "the limits section of the README."
+            )
+        elif not info.is_mcp_server and not entrypoint:
+            st.skip(
+                "detect found no MCP server here (nothing declares an MCP "
+                "dependency), so dynamic analysis is not applicable; pass "
+                "--entrypoint to override"
+            )
         elif not info.launch_argv:
             note = "; ".join(info.detection_notes) or "no launch command"
-            st.skip(f"no launch command could be derived from target metadata ({note})")
+            st.skip(
+                f"no launch command could be derived from target metadata "
+                f"({note})"
+            )
+            st.artifacts["candidates_considered"] = [
+                c.as_dict() for c in info.launch_candidates
+            ]
         else:
             from .dynamic import run_dynamic
             found, meta = run_dynamic(info, sandbox=sandbox, timeout=timeout,

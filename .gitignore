@@ -81,3 +81,10 @@ coverage/
 # Documentation builds
 docs/_build/
 site/
+# ephemeral venvs created for Python targets
+.mcpguard-venv/
+
+# dependency trees installed into fixtures during dynamic tests
+tests/fixtures/**/node_modules/
+tests/fixtures/**/dist/
+tests/fixtures/**/package-lock.json

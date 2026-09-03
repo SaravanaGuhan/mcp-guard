@@ -1,7 +1,7 @@
 [project]
 name = "python-mcp-server"
 version = "1.0.0"
-dependencies = ["mcp==1.2.0"]
+dependencies = []
 
 [project.scripts]
 python-mcp-server = "python_mcp_server:main"

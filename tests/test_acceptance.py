@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import needs_network, needs_node, rule_ids, run_scan_on, stage
+import os
+
+from conftest import (fixture_path, needs_network, needs_node,
+                      rule_ids, run_scan_on, stage)
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +53,9 @@ def test_not_a_server_dynamic_does_not_run():
     r = run_scan_on("not-a-server", allow_execute=True, skip_install=True)
     st = stage(r, "dynamic")
     assert st.ran is False
-    assert "launch command" in (st.reason or "")
+    # Phase B distinguishes "not an MCP server" from "could not derive a
+    # command"; not-a-server is the former.
+    assert "no MCP server" in (st.reason or "")
     assert r.findings == []
 
 
@@ -183,11 +188,26 @@ def test_python_server_taint_reaches_shell_and_path_sinks():
     ids = rule_ids(r)
     assert "MCPG-PY-SHELL-TAINT" in ids
     assert "MCPG-PY-PATH-TAINT" in ids
-    srcs = " ".join(f.evidence.matched_source for f in r.findings)
+    static = [f for f in r.findings if f.evidence.kind == "static"]
+    srcs = " ".join(f.evidence.matched_source for f in static)
     assert "shell=True" in srcs
     # The safe call must not be reported.
     assert 'subprocess.run(["git", "status"]' not in srcs
-    assert "git" not in srcs or "shell=True" in srcs
+
+
+@needs_node
+def test_python_server_launches_in_an_ephemeral_venv():
+    """Phase B: Python targets get their own venv, outside the target tree."""
+    r = run_scan_on("python-server", allow_execute=True)
+    st = stage(r, "dynamic")
+    assert st.ran is True, st.reason
+    venv = st.artifacts.get("venv", "")
+    assert venv, "no venv recorded in stage artifacts"
+    assert os.path.abspath(fixture_path("python-server")) not in os.path.abspath(venv), (
+        "the venv must live outside the target tree, or static analysis scans it")
+    ids = rule_ids(r)
+    assert "MCPG-DYN-CMDEXEC" in ids
+    assert "MCPG-DYN-PATHTRAVERSAL" in ids
 
 
 def test_ts_server_flags_prompt_injection_not_safe_execfile():

@@ -236,3 +236,54 @@ def docker_argv(
     argv += [image, "sh", "-c",
              "cp -a /src/. " + workdir + " 2>/dev/null; " + " ".join(inner_argv)]
     return argv
+
+
+# ---------------------------------------------------------------------------
+# Build-tool resolution
+# ---------------------------------------------------------------------------
+
+
+def resolve_bin(root: str, name: str) -> Optional[tuple]:
+    """Find a build tool, preferring the target's OWN node_modules/.bin.
+
+    Returns ``(argv_prefix, provenance)`` or None. Order:
+      1. <root>/node_modules/.bin/<name>        -- the version the target pinned
+      2. npx --no-install <name>                -- already in the npx cache
+      3. nothing; the caller reports a build failure naming the tool
+
+    A global toolchain is never used silently: provenance is recorded in the
+    stage artifacts so a report says which tsc actually ran.
+    """
+    binroot = os.path.join(root, "node_modules", ".bin")
+    if os.path.isdir(binroot):
+        for suffix in ((".cmd", ".exe", "") if os.name == "nt" else ("",)):
+            cand = os.path.join(binroot, name + suffix)
+            if os.path.exists(cand):
+                return ([cand], f"target node_modules/.bin/{name}{suffix}")
+
+    npx = shutil.which("npx") or (shutil.which("npx.cmd") if os.name == "nt" else None)
+    if npx:
+        return ([npx, "--no-install", name], f"npx --no-install {name} (npx cache)")
+
+    return None
+
+
+def rewrite_script_command(root: str, script: str) -> Optional[tuple]:
+    """Turn an npm script body into a runnable argv using target-local tools.
+
+    `npm run build` fails when the tool is not on PATH even though the target
+    ships it in node_modules/.bin, which is where npm itself would find it.
+    We resolve the first token ourselves so the same build works without a
+    global install.
+    """
+    parts = script.strip().split()
+    if not parts:
+        return None
+    tool = parts[0]
+    if tool in ("node", "npm", "npx", "yarn", "pnpm"):
+        return None  # let npm handle its own verbs
+    hit = resolve_bin(root, tool)
+    if hit is None:
+        return None
+    prefix, provenance = hit
+    return (prefix + parts[1:], provenance)

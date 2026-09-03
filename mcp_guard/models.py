@@ -271,6 +271,25 @@ class ScanStatus:
         }
 
 
+@dataclass(frozen=True)
+class LaunchCandidate:
+    """One way the target itself says it can be started.
+
+    ``source`` names the declaration it came from (package.json bin, pyproject
+    [project.scripts], mcp.json, ...) so a launch failure is debuggable from the
+    report without reading the scanner's source.
+    """
+
+    source: str
+    argv: List[str]
+    requires_build: bool = False
+    note: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"source": self.source, "argv": list(self.argv),
+                "requires_build": self.requires_build, "note": self.note}
+
+
 @dataclass
 class ServerInfo:
     """What detection concluded about the target. No guessing beyond this."""
@@ -282,6 +301,8 @@ class ServerInfo:
     version: Optional[str] = None
     entrypoint: Optional[str] = None      # derived from target metadata only
     launch_argv: Optional[List[str]] = None
+    launch_candidates: List["LaunchCandidate"] = field(default_factory=list)
+    launch_python: Optional[str] = None   # venv interpreter, set by prepare()
     build_argv: Optional[List[str]] = None
     install_argv: Optional[List[str]] = None
     transport: str = "stdio"
@@ -291,7 +312,9 @@ class ServerInfo:
     detection_notes: List[str] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["launch_candidates"] = [c.as_dict() for c in self.launch_candidates]
+        return d
 
 
 @dataclass
