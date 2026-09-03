@@ -5,7 +5,7 @@ not-a-server          0   0   0   0  -
 instant-exit          0   0   0   0  -
 always-error-live     0   0   0   0  -
 vulnerable-server     5   3   0   0  cmd-injection,hardcoded-secret,path-traversal
-python-server         2   2   0   0  cmd-injection,path-traversal
+python-server         4   2   0   0  cmd-injection,path-traversal
 ts-server             1   1   0   0  prompt-injection
 docker-server         2   2   0   0  container-root,world-writable
 ------------------------------------------------------------------------

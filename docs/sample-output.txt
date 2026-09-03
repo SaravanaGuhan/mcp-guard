@@ -2,10 +2,10 @@
 MCP GUARD SECURITY REPORT
 ==============================================================================
 Target        : tests/fixtures/vulnerable-server
-Commit        : 0fedec81bce688d522506d3e9c72dc31a397d792
+Commit        : 47439cee2b7ec4789c0c68fadda700fe0c0c9247
 Server type   : nodejs  (vulnerable-mcp-server)
 MCP server    : yes
-Entrypoint    : index.js
+Entrypoint    : package.json main: node index.js
 Tool version  : 2.0.0
 
 ------------------------------------------------------------------------------
@@ -16,15 +16,27 @@ STAGES
   detect        ran            0.00s
        server_type: nodejs
        is_mcp_server: True
-       entrypoint: index.js
+       entrypoint: package.json main: node index.js
        notes: []
   static        ran            0.01s
        findings: 3
+       parallel: serial
+       files_analysed: 2
+       dockerfiles: 0
+       files_seen: 3
+       skipped_directories: ['.cache', '.git', '.idea', '.mcpguard-venv', '.mypy_cache', '.next', '.nuxt', '.pytest_cache', '.tox', '.turbo', '.venv', '.vscode', '__pycache__', 'coverage', 'dist-info', 'htmlcov', 'node_modules', 'site-packages', 'vendor', 'venv']
+       skipped_generated_or_minified: 0
+       cache_hits: 2
+       cache_misses: 0
   dependencies  DID NOT RUN    0.00s
        reason: offline mode: OSV lookup skipped
-  dynamic       ran           10.13s
+  dynamic       ran            2.26s
        probes_run: 8
+       handshake_rtt_ms: 2.0
+       install: skipped (--skip-install)
+       candidates_tried: [{'source': 'package.json main', 'argv': 'node index.js', 'ok': True, 'reason': None}]
        launch_argv: C:\Program Files\nodejs\node.EXE index.js
+       launch_source: package.json main
        server_name: vulnerable-server
        capabilities: ['resources', 'tools']
        tools_discovered: 1
@@ -41,9 +53,9 @@ FINDINGS
       Tool argument reaches a shell (proven by canary execution) -- tools/call run.cmd
       cwe: CWE-78   vector: CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H
       oracle: cmd-injection-canary
-      sent  > {"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "run", "arguments": {"cmd": "echo MCPGUARD^_7c262e81991b4a9aba60e87d9c87798f"}}}
-      recv  < {"jsonrpc":"2.0","id":6,"result":{"content":[{"type":"text","text":"MCPGUARD_7c262e81991b4a9aba60e87d9c87798f\r\n"}]}}
-      proof : response contains 'MCPGUARD_7c262e81991b4a9aba60e87d9c87798f', which is the shell-collapsed form of the payload 'echo MCPGUARD^_7c262e81991b4a9aba60e87d9c87798f'. The collapsed form was never transmitted (it does not appear in the request bytes), so the argument was interpreted by a shell rather than echoed back.
+      sent  > {"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "run", "arguments": {"cmd": "echo MCPGUARD^_4b7a7d4e7c464289b79d2aa5bfc894a9"}}}
+      recv  < {"jsonrpc":"2.0","id":6,"result":{"content":[{"type":"text","text":"MCPGUARD_4b7a7d4e7c464289b79d2aa5bfc894a9\r\n"}]}}
+      proof : response contains 'MCPGUARD_4b7a7d4e7c464289b79d2aa5bfc894a9', which is the shell-collapsed form of the payload 'echo MCPGUARD^_4b7a7d4e7c464289b79d2aa5bfc894a9'. The collapsed form was never transmitted (it does not appear in the request bytes), so the argument was interpreted by a shell rather than echoed back.
       fix: Do not pass tool arguments to a shell. Use execFile/spawn with an
            argument vector, validate against an allowlist, and reject shell
            metacharacters.
@@ -66,12 +78,12 @@ FINDINGS
       fix: Move the secret to an environment variable and rotate it.
 
   [4] HIGH      8.2  MCPG-DYN-PATHTRAVERSAL
-      Resource/tool path escapes the server root (proven by canary file) -- resources/read file://C:\Users\Work\AppData\Local\Temp\mcpguard_canary_eu54lul_.txt
+      Resource/tool path escapes the server root (proven by canary file) -- resources/read file://C:\Users\Work\AppData\Local\Temp\mcpguard_canary_bjx6a4gq.txt
       cwe: CWE-22   vector: CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:H/SI:N/SA:N
       oracle: resource-traversal-canary
-      sent  > {"jsonrpc": "2.0", "id": 7, "method": "resources/read", "params": {"uri": "file://C:\\Users\\Work\\AppData\\Local\\Temp\\mcpguard_canary_eu54lul_.txt"}}
-      recv  < {"jsonrpc":"2.0","id":7,"result":{"contents":[{"uri":"file://C:\\Users\\Work\\AppData\\Local\\Temp\\mcpguard_canary_eu54lul_.txt","text":"MCPGUARD-CANARY-a773ed
-      proof : response contains the contents of C:\Users\Work\AppData\Local\Temp\mcpguard_canary_eu54lul_.txt, a file written outside the target root. The server read a path that escaped its own directory.
+      sent  > {"jsonrpc": "2.0", "id": 7, "method": "resources/read", "params": {"uri": "file://C:\\Users\\Work\\AppData\\Local\\Temp\\mcpguard_canary_bjx6a4gq.txt"}}
+      recv  < {"jsonrpc":"2.0","id":7,"result":{"contents":[{"uri":"file://C:\\Users\\Work\\AppData\\Local\\Temp\\mcpguard_canary_bjx6a4gq.txt","text":"MCPGUARD-CANARY-7606bb
+      proof : response contains the contents of C:\Users\Work\AppData\Local\Temp\mcpguard_canary_bjx6a4gq.txt, a file written outside the target root. The server read a path that escaped its own directory.
       fix: Resolve the path and verify it is contained by an allowed root
            (os.path.realpath + prefix check / path.resolve + startsWith)
            before reading.
