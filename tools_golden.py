@@ -64,7 +64,17 @@ def finding_record(f) -> dict:
     return rec
 
 
+_FIXTURE_CACHE: dict = {}
+
+
 def scan_fixture(name: str) -> dict:
+    """Memoised: the golden suite asserts on the same scan three times."""
+    if name not in _FIXTURE_CACHE:
+        _FIXTURE_CACHE[name] = _scan_fixture_uncached(name)
+    return _FIXTURE_CACHE[name]
+
+
+def _scan_fixture_uncached(name: str) -> dict:
     path = os.path.join(FIXTURES, name)
     deps = name in NETWORK_FIXTURES
     result, acquired = run_scan(
@@ -73,6 +83,7 @@ def scan_fixture(name: str) -> dict:
         skip_install=True,
         deps_enabled=deps,
         static_enabled=True,
+        use_cache=False,
     )
     if acquired:
         acquired.cleanup()

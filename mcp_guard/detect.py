@@ -303,6 +303,11 @@ def _detect_nodejs(root: str, pkg_path: str) -> ServerInfo:
             f"monorepo: {len(members)} workspace member(s) declared, "
             f"{len(member_cands)} launchable MCP server entry point(s)")
         cands.extend(member_cands)
+        if member_cands:
+            # A monorepo root often declares no MCP dependency itself. If its
+            # members do, the repository is an MCP project and the dynamic
+            # stage must not skip it as "no MCP server here".
+            info.is_mcp_server = True
 
     _apply_candidates(info, cands)
     if not cands:
@@ -320,7 +325,7 @@ def _detect_nodejs(root: str, pkg_path: str) -> ServerInfo:
             info.lockfiles.append(lf)
 
     blob = json.dumps(pkg).lower()
-    info.is_mcp_server = any(h in blob for h in MCP_HINTS)
+    info.is_mcp_server = info.is_mcp_server or any(h in blob for h in MCP_HINTS)
     return info
 
 
@@ -420,13 +425,27 @@ def _detect_python(root: str) -> ServerInfo:
             "mcp.json; nothing in the project declares how to start it")
 
     info.dependencies = deps
-    info.is_mcp_server = any(h in blob for h in MCP_HINTS)
+    # Substring hints alone miss the official Python SDK, whose distribution is
+    # named exactly "mcp" -- a bare substring test for "mcp" would fire on any
+    # word containing those letters, so match parsed dependency names instead.
+    info.is_mcp_server = (
+        any(h in blob for h in MCP_HINTS)
+        or any(_is_mcp_distribution(name) for name in deps)
+    )
     return info
 
 
 # ---------------------------------------------------------------------------
 # Go / Docker / generic
 # ---------------------------------------------------------------------------
+
+
+def _is_mcp_distribution(name: str) -> bool:
+    """True for the Python SDK distribution and its extras/forks by name."""
+    n = name.strip().lower().replace("_", "-")
+    base = n.split("[")[0]
+    return base == "mcp" or base.startswith("mcp-") or base in (
+        "fastmcp", "modelcontextprotocol")
 
 
 def _detect_go(root: str) -> ServerInfo:

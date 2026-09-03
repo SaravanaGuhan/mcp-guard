@@ -34,7 +34,7 @@ jobs:
           pip install tree-sitter tree-sitter-javascript cvss jsonschema
 
       - name: Run the suite
-        run: python -m pytest tests
+        run: python -m pytest tests -n 4 --dist loadfile
 
       - name: Verify the tool runs end to end
         run: python -m mcp_guard.cli tests/fixtures/clean-server --offline --fail-on high

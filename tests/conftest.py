@@ -54,15 +54,42 @@ def repo_root() -> str:
     return REPO
 
 
-def run_scan_on(name: str, **kwargs):
-    """Scan a fixture and return the ScanResult."""
+# Session-scoped scan cache.
+#
+# The suite asserts on the same handful of fixtures from many angles, and the
+# baseline re-ran a full scan -- including launching a Node process -- for every
+# one. Scans are pure with respect to their arguments, so the result is memoised
+# on (fixture, arguments). Tests that need a genuinely fresh scan (cache
+# behaviour, determinism) call run_scan_fresh().
+_SCAN_CACHE: dict = {}
+
+
+def _key(name: str, kwargs: dict):
+    return (name, tuple(sorted(kwargs.items())))
+
+
+def run_scan_fresh(name: str, **kwargs):
+    """Always perform a real scan. Use when the test is about scanning itself."""
     from mcp_guard.scan import run_scan
 
     kwargs.setdefault("deps_enabled", False)
+    # The static result cache would otherwise short-circuit the analyzers, so
+    # the suite would assert on cached JSON instead of exercising the rules.
+    kwargs.setdefault("use_cache", False)
     result, acquired = run_scan(fixture_path(name), **kwargs)
     if acquired is not None:
         acquired.cleanup()
     return result
+
+
+def run_scan_on(name: str, **kwargs):
+    """Scan a fixture and return the ScanResult, memoised for the session."""
+    kwargs.setdefault("deps_enabled", False)
+    kwargs.setdefault("use_cache", False)
+    k = _key(name, kwargs)
+    if k not in _SCAN_CACHE:
+        _SCAN_CACHE[k] = run_scan_fresh(name, **kwargs)
+    return _SCAN_CACHE[k]
 
 
 def rule_ids(result) -> set:
