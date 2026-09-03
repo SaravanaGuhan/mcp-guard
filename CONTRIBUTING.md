@@ -37,7 +37,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 4. **Run tests**:
    ```bash
-   python test_mcp_scanner.py
+   python -m pytest tests
    python test_download.py
    ```
 
@@ -56,9 +56,9 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 3. **Test your changes**:
    ```bash
-   python test_mcp_scanner.py
+   python -m pytest tests
    python test_download.py
-   python mcp_scanner.py --help  # Test CLI functionality
+   python -m mcp_guard.cli --help  # Test CLI functionality
    ```
 
 4. **Commit your changes**:
@@ -159,7 +159,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 ### Code Organization
 ```
 mcp-guard/
-├── mcp_scanner.py          # Main scanner logic
+├── mcp_guard/              # Scanner package (models, static, dynamic, deps, report)
 ├── simple_vulnerability_scoring.py  # Scoring system
 ├── test_*.py               # Test files
 ├── docs/                   # Documentation
