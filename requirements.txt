@@ -1,23 +1,11 @@
-# Core dependencies for MCP Guard Security Scanner
-requests>=2.31.0
-pyyaml>=6.0
+# Runtime dependencies for MCP Guard
+requests>=2.31.0        # repository acquisition, OSV API
+cvss>=3.0               # CVSS v4.0 vector parsing and scoring
+PyYAML>=6.0             # yarn.lock / pnpm-lock parsing helpers
+tomli>=2.0.0; python_version < "3.11"   # pyproject parsing on 3.10
 
-# Optional dependencies for enhanced functionality
-websockets>=11.0.0  # For WebSocket MCP server testing
-aiohttp>=3.8.0      # For HTTP-based dynamic analysis
-tomli>=2.0.0        # For Python project file parsing (Python < 3.11)
-
-# Security analysis tools (optional - will fallback gracefully if not available)
-bandit>=1.7.0       # Python security analysis
-safety>=2.3.0       # Python dependency vulnerability checking
-
-# Development dependencies (optional)
-pytest>=7.0.0       # Testing framework
-pytest-asyncio>=0.21.0  # Async testing support
-pytest-cov>=4.0.0   # Coverage reporting
-black>=23.0.0       # Code formatting
-flake8>=6.0.0       # Linting
-
-# Documentation dependencies (optional)
-mkdocs>=1.5.0       # Documentation generation
-mkdocs-material>=9.0.0  # Material theme for docs
+# Development / test
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+jsonschema>=4.0.0       # SARIF schema validation in tests
