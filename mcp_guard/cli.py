@@ -48,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="isolation for dynamic analysis (default: none)",
     )
     ex.add_argument(
+        "--skip-install", action="store_true",
+        help="assume the target's dependencies are already present; skip the "
+             "install step (it is also skipped automatically when node_modules "
+             "already exists)",
+    )
+    ex.add_argument(
         "--timeout", type=int, default=120,
         help="per-subprocess timeout in seconds (default: 120)",
     )
@@ -89,6 +95,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             deps_enabled=not args.no_deps,
             offline=args.offline,
             timeout=args.timeout,
+            skip_install=args.skip_install,
         )
 
         acq = result.status("acquire")

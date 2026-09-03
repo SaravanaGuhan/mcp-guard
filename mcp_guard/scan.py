@@ -63,6 +63,7 @@ def run_scan(
     deps_enabled: bool = True,
     offline: bool = False,
     timeout: int = 120,
+    skip_install: bool = False,
 ) -> tuple[ScanResult, Optional[Acquired]]:
     result = ScanResult(
         target=target,
@@ -132,7 +133,8 @@ def run_scan(
             st.skip(f"no launch command could be derived from target metadata ({note})")
         else:
             from .dynamic import run_dynamic
-            found, meta = run_dynamic(info, sandbox=sandbox, timeout=timeout)
+            found, meta = run_dynamic(info, sandbox=sandbox, timeout=timeout,
+                                      skip_install=skip_install)
             if meta.get("ran"):
                 result.findings.extend(found)
                 st.done(**{k: v for k, v in meta.items() if k != "ran"})
