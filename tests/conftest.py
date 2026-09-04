@@ -48,11 +48,36 @@ def have_network() -> bool:
         return False
 
 
-needs_node = pytest.mark.skipif(
-    not have_node(), reason="node is not installed; dynamic tests need it")
+# Real markers rather than skipif aliases, so they are selectable
+# (`-m "not needs_network"`) and so --strict-markers has something to check.
+# The skip itself is applied in pytest_collection_modifyitems below, once, and
+# the prerequisite probes run at most once per session.
+needs_node = pytest.mark.needs_node
+needs_network = pytest.mark.needs_network
 
-needs_network = pytest.mark.skipif(
-    not have_network(), reason="OSV API unreachable; dependency tests need it")
+_PREREQS: dict = {}
+
+
+def _prereq(name: str, probe) -> bool:
+    if name not in _PREREQS:
+        _PREREQS[name] = probe()
+    return _PREREQS[name]
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip marked tests when their prerequisite is missing.
+
+    They skip rather than fail, but a skipped test is not a passing one: if
+    node or the OSV API is unavailable, the dynamic and dependency suites did
+    not run and the report says so.
+    """
+    for item in items:
+        if "needs_node" in item.keywords and not _prereq("node", have_node):
+            item.add_marker(pytest.mark.skip(
+                reason="node is not installed; dynamic tests need it"))
+        if "needs_network" in item.keywords and not _prereq("net", have_network):
+            item.add_marker(pytest.mark.skip(
+                reason="OSV API unreachable; dependency tests need it"))
 
 
 @pytest.fixture(scope="session")

@@ -325,8 +325,10 @@ def test_transport_correlates_concurrent_requests():
         client.start_stderr_pump()
         exchanges = await asyncio.gather(*[
             client.request("m", {}, timeout=10.0) for _ in range(12)])
-        await client.close()
-        proc.kill()
+        # Tear down through the production path, so this test does not leak a
+        # transport of its own and mask a regression in the real one.
+        from mcp_guard.dynamic.harness import shutdown
+        await shutdown(client)
         return exchanges
 
     if os.name == "nt":

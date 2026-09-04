@@ -99,3 +99,37 @@ select = ["E", "F", "I", "W"]
 # a detection rule is a change to detection code for a style reason, so it is
 # left alone and recorded here instead.
 "src/mcp_guard/static/dockerfile.py" = ["E741"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "-q",
+    "--strict-markers",
+    "--cov=mcp_guard",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-fail-under=78",
+    "-n", "4",
+    "--dist", "loadfile",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "needs_node: requires the node binary to launch a fixture server",
+    "needs_network: requires reaching the OSV API",
+]
+
+[tool.coverage.run]
+source = ["src/mcp_guard"]
+branch = false
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+]
+
+[tool.coverage.report]
+# Lines that exist to make a failure visible, not to be exercised.
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

@@ -376,7 +376,7 @@ async def _try_one(info, candidate, *, sandbox, timeout, artifacts,
     await asyncio.sleep(0.35)
     if proc.returncode is not None:
         tail = client.stderr_tail(20)
-        await client.close()
+        await shutdown(client)
         return HarnessResult(
             False,
             "server exited immediately with code " + str(proc.returncode) +
@@ -515,10 +515,18 @@ async def launch_and_handshake(info, *, sandbox, timeout, artifacts=None,
     return HarnessResult(False, reason, artifacts=merged)
 
 
-async def shutdown(client: Optional[StdioClient]) -> None:
+async def shutdown(client) -> None:
+    """Stop the target and release the transport, in that order.
+
+    Every exit from the dynamic stage goes through here, including the paths
+    where the process has already died on its own. Reaping a process is not the
+    same as closing its pipes, and only closing the transport does the latter.
+    """
     if client is None:
         return
+
     await client.close()
+
     proc = client.proc
     if proc.returncode is None:
         try:
@@ -530,3 +538,16 @@ async def shutdown(client: Optional[StdioClient]) -> None:
                 await asyncio.wait_for(proc.wait(), timeout=5)
             except Exception:
                 pass
+    else:
+        # Already exited. wait() still has to be awaited so asyncio reaps it and
+        # drops its own references; skipping this was how transports survived
+        # to be finalised after the loop had closed.
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5)
+        except Exception:
+            pass
+
+    client.close_transport()
+    # Let the close callbacks scheduled above actually run before the caller
+    # returns and asyncio.run() tears the loop down.
+    await asyncio.sleep(0)

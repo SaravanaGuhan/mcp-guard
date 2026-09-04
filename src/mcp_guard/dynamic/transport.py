@@ -254,12 +254,49 @@ class StdioClient:
         return ex
 
     async def close(self) -> None:
+        """Release everything this client owns, deterministically.
+
+        Cancelled tasks are awaited rather than merely cancelled: a task that
+        has not yet observed its cancellation still holds a reference to the
+        stream it was reading, which keeps the transport alive past the point
+        the caller believes it is gone.
+        """
         for task in (self._stderr_task, self._reader_task):
-            if task:
-                task.cancel()
+            if task is None:
+                continue
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._stderr_task = None
+        self._reader_task = None
+
+        for fut in list(self._pending.values()):
+            if not fut.done():
+                fut.cancel()
+        self._pending.clear()
+
         try:
             if self.proc.stdin and not self.proc.stdin.is_closing():
                 self.proc.stdin.close()
+        except Exception:
+            pass
+
+    def close_transport(self) -> None:
+        """Close the subprocess transport and its pipes.
+
+        asyncio does not do this for us. Left to the garbage collector,
+        BaseSubprocessTransport.__del__ runs after asyncio.run() has closed the
+        loop and raises "Event loop is closed" from call_soon. Closing here
+        means the pipe handles are released when the scan ends rather than
+        whenever a collection happens to run.
+        """
+        transport = getattr(self.proc, "_transport", None)
+        if transport is None:
+            return
+        try:
+            transport.close()
         except Exception:
             pass
 
