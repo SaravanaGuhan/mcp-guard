@@ -18,8 +18,7 @@ parsed, so the evidence is the literal text at the reported position.
 from __future__ import annotations
 
 import ast
-import os
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 from ..models import Finding, StaticEvidence
 from ..rules import get as get_rule

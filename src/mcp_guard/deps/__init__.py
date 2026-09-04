@@ -19,7 +19,6 @@ does not, the generic MCPG-DEP-KNOWN-VULN vector is used and the report says so.
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..models import DependencyEvidence, Finding, ServerInfo, Severity

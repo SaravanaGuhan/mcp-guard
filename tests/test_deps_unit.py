@@ -7,9 +7,6 @@ test exercises only for npm.
 from __future__ import annotations
 
 import json
-import os
-
-import pytest
 
 from mcp_guard.deps import lockfiles, osv
 

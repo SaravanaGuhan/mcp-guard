@@ -11,28 +11,25 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import shutil
-import time
 import re
 import shutil
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..execution import (
-    RunResult,
-    SandboxUnavailable,
     docker_argv,
     install_command,
     install_env,
-    kill_tree,
     require_docker,
-    resolve_bin,
     rewrite_script_command,
-    run as run_sync,
     warn_executing,
 )
-from ..models import LaunchCandidate, ServerInfo
+from ..execution import (
+    run as run_sync,
+)
+from ..models import LaunchCandidate
 from .transport import Exchange, StdioClient, spawn
 
 PROTOCOL_VERSION = "2024-11-05"

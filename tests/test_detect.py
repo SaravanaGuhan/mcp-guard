@@ -11,8 +11,7 @@ import os
 
 import pytest
 
-from mcp_guard.detect import detect, iter_source_files, _skip_dirs_for
-
+from mcp_guard.detect import _skip_dirs_for, detect, iter_source_files
 
 # ---------------------------------------------------------------------------
 # type detection

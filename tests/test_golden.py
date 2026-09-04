@@ -17,9 +17,8 @@ import os
 
 import pytest
 
-from conftest import REPO, needs_network, needs_node
-
 import golden as golden_tool
+from conftest import REPO, needs_network, needs_node
 
 GOLDEN = os.path.join(REPO, "tests", "golden")
 

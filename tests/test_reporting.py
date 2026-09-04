@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from conftest import REPO, fixture_path, run_scan_on
+from conftest import fixture_path, run_scan_on
 
 SCHEMA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "schemas", "sarif-2.1.0.json")

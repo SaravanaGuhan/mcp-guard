@@ -159,7 +159,7 @@ def render(result: ScanResult, shown=None, suppressed: int = 0) -> str:
             L.extend(_evidence_block(head))
 
             if n > 1:
-                L.append(f"      also at:")
+                L.append("      also at:")
                 for other in sorted(group, key=_location_key)[:MAX_LOCATIONS]:
                     if other is head:
                         continue

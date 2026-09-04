@@ -17,9 +17,9 @@ This is enforced structurally, not by convention:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Union
 
 SCHEMA_VERSION = "2.0.0"
 

@@ -77,3 +77,25 @@ version = { attr = "mcp_guard.__version__" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["mcp_guard*"]
+
+[tool.ruff]
+src = ["src", "tests", "scripts"]
+# 100 rather than 88. The 12 lines over 88 are all inside detection modules,
+# and reflowing scanner logic to satisfy a style limit is a change to detection
+# code for a cosmetic reason. The limit is set where the code already sits.
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Deliberately narrow: pycodestyle errors, pyflakes, import sorting, warnings.
+# The broader default set in recent ruff versions wants to rewrite 386 type
+# annotations (UP006/UP035/UP045) and to reshape exception handling inside the
+# detection rules (BLE001, S110, PLW1510). Those are judgement calls in scanner
+# logic, not lint, so they are not enabled here. See docs for the list.
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# E741: dockerfile.py iterates `for ln, l in lines`. Renaming a loop variable in
+# a detection rule is a change to detection code for a style reason, so it is
+# left alone and recorded here instead.
+"src/mcp_guard/static/dockerfile.py" = ["E741"]

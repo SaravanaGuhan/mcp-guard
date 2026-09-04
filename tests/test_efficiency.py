@@ -12,8 +12,7 @@ import os
 
 import pytest
 
-from conftest import REPO, fixture_path, needs_node, run_scan_fresh, run_scan_on
-
+from conftest import fixture_path, needs_node, run_scan_fresh, run_scan_on
 
 # ---------------------------------------------------------------------------
 # Phase B: entrypoint derivation

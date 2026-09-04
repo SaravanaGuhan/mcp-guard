@@ -12,12 +12,12 @@ import tempfile
 
 import pytest
 
-from conftest import REPO, needs_node, run_scan_on
-
 # Derived from the INSTALLED package, not from the repo layout: with a src
 # layout the tests assert against what is importable, and this keeps working if
 # the directory moves again.
 import mcp_guard as _pkg
+from conftest import REPO, needs_node, run_scan_on
+
 PKG = os.path.dirname(_pkg.__file__)
 
 BANNED_PHRASES = (
@@ -72,8 +72,7 @@ def test_finding_rejects_none_and_wrong_type_evidence():
 
 
 def test_evidence_types_reject_empty_raw_data():
-    from mcp_guard.models import (DependencyEvidence, DynamicEvidence,
-                                  StaticEvidence)
+    from mcp_guard.models import DependencyEvidence, DynamicEvidence, StaticEvidence
 
     with pytest.raises(ValueError):
         StaticEvidence(file="a.py", line=1, column=1, matched_source="",
@@ -288,8 +287,8 @@ def test_default_mode_never_spawns_a_target_process():
     """Static and dependency analysis must execute nothing."""
     import subprocess
 
-    from mcp_guard.scan import run_scan
     from conftest import fixture_path
+    from mcp_guard.scan import run_scan
 
     spawned = []
     real_popen, real_run = subprocess.Popen, subprocess.run

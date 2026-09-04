@@ -18,7 +18,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 ECOSYSTEM_NPM = "npm"
 ECOSYSTEM_PYPI = "PyPI"

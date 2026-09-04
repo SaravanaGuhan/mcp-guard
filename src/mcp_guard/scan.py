@@ -14,10 +14,9 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from . import __version__
-from .acquire import AcquireError, Acquired, acquire
+from .acquire import Acquired, acquire
 from .detect import detect
 from .models import Finding, ScanResult, ScanStatus
-
 
 _PROGRESS = {"on": False}
 

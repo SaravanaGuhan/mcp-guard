@@ -22,8 +22,6 @@ imported from another module, is not analysed.
 
 from __future__ import annotations
 
-import json
-import os
 import re
 from typing import Dict, List, Optional, Set, Tuple
 

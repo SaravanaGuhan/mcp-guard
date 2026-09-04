@@ -10,9 +10,7 @@ production code carries no profiling hooks.
 from __future__ import annotations
 
 import io
-import json
 import os
-import sys
 import time
 from collections import Counter, defaultdict
 
@@ -93,8 +91,8 @@ def peak_rss_mb() -> float:
 
 
 def instrument():
-    import mcp_guard.detect as detect
     import mcp_guard.deps.osv as osv
+    import mcp_guard.detect as detect
     import mcp_guard.dynamic as dyn
     import mcp_guard.dynamic.harness as harness
     import mcp_guard.static.ast_javascript as astjs
@@ -232,7 +230,6 @@ def profile_target(path: str, label: str, allow_execute: bool,
 
     S.reset()
     t0 = time.perf_counter()
-    err = None
     try:
         result, acquired = run_scan(path, allow_execute=allow_execute,
                                     skip_install=True, deps_enabled=deps,

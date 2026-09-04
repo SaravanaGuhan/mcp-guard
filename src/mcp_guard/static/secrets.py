@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 import os
 import re
-from typing import Iterable, List, Optional, Tuple
+from typing import List
 
 from ..models import Finding, StaticEvidence
 from ..rules import get as get_rule

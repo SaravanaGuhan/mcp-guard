@@ -7,15 +7,18 @@ mcp_guard/ to pass, the detection logic is wrong.
 
 from __future__ import annotations
 
-import pytest
-
 import os
 
+from conftest import (
+    fixture_path,
+    needs_network,
+    needs_node,
+    rule_ids,
+    run_scan_on,
+    stage,
+)
+
 ADVISORY_ID_RE = r"^(GHSA|CVE|OSV|PYSEC|GO|MAL)-[\w.-]+$"
-
-from conftest import (fixture_path, needs_network, needs_node,
-                      rule_ids, run_scan_on, stage)
-
 
 # ---------------------------------------------------------------------------
 # clean-server: nothing to find, and both stages actually ran

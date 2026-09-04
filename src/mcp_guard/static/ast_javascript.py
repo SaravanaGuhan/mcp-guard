@@ -16,7 +16,6 @@ function, the parameter name is reported. That trace is intraprocedural.
 
 from __future__ import annotations
 
-import os
 from typing import List, Optional, Set, Tuple
 
 from ..models import Finding, StaticEvidence
