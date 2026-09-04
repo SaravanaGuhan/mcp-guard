@@ -251,7 +251,7 @@ construct, and an oracle that ignores its `response` argument fails a test in
 
 Versions before 2.0.0 emitted fabricated findings: a large part of the reported
 output was not derived from any observation of the target. The tool was
-audited, the findings documented in [docs/AUDIT.md](docs/AUDIT.md), and rebuilt
+audited, the findings documented in [docs/audit-2026-09.md](docs/audit-2026-09.md), and rebuilt
 around the evidence requirement described at the top of this file. See
 [CHANGELOG.md](CHANGELOG.md).
 

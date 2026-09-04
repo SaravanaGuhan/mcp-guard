@@ -8,7 +8,7 @@
 merely inaccurate — a substantial part of the reported output was not derived
 from any observation of the target.
 
-An audit at commit `7900ec9` ([docs/AUDIT.md](docs/AUDIT.md)) established, with
+An audit at commit `7900ec9` ([docs/audit-2026-09.md](docs/audit-2026-09.md)) established, with
 reproducible experiments:
 
 - Five findings ("Command Injection", "Path Traversal", "Authorization Bypass",
