@@ -22,19 +22,40 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # The dynamic tests launch the Node fixtures; without node they skip.
+      # The dynamic tests launch the Node fixtures. Without node they skip
+      # rather than fail, but then they are not testing anything.
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
+      # Editable install so the tests import the same package a user installs.
+      # The dev extra carries pytest-xdist, which pytest.ini's addopts require.
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install tree-sitter tree-sitter-javascript cvss jsonschema
+          pip install -e ".[dev]"
 
+      # Options live in pytest.ini; passing them again here is how they got
+      # duplicated before.
       - name: Run the suite
-        run: python -m pytest tests -n 4 --dist loadfile
+        run: python -m pytest
 
-      - name: Verify the tool runs end to end
+      - name: Verify the console script works
+        run: mcp-guard --version
+
+      - name: Verify the module entry point works
         run: python -m mcp_guard.cli tests/fixtures/clean-server --offline --fail-on high
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check src tests scripts

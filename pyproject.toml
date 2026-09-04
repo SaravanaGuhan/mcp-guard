@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-guard"
+description = "Evidence-backed security scanner for Model Context Protocol servers"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "SaravanaGuhan", email = "saravanaguhan123@gmail.com" }]
+keywords = ["mcp", "model-context-protocol", "security", "scanner", "sast", "cvss"]
+
+# 3.11 is the real floor, not 3.10. detect.py reads pyproject.toml with the
+# stdlib tomllib, which arrived in 3.11; on 3.10 that path needs the third-party
+# tomli, and nothing verifies it. Every profile and test run in this repository
+# was on 3.11.
+requires-python = ">=3.11"
+
+# Single source of truth: mcp_guard.__version__. See [tool.setuptools.dynamic].
+dynamic = ["version"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+# Exactly what the package imports at runtime, and nothing else.
+#   requests                  acquire.py, deps/osv.py
+#   cvss                      scoring/cvss.py
+#   tree-sitter               static/ast_javascript.py, static/mcp_rules.py
+#   tree-sitter-javascript    the grammar those two load
+#
+# tree-sitter is a hard dependency rather than an extra on purpose. Its import
+# sits behind a try/except, and without it AVAILABLE goes False and JavaScript
+# and TypeScript analysis returns nothing at all. A scanner that silently stops
+# looking is worse than one that fails to install.
+dependencies = [
+    "requests>=2.31.0",
+    "cvss>=3.0",
+    "tree-sitter>=0.21",
+    "tree-sitter-javascript>=0.21",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-asyncio>=0.21.0",
+    "jsonschema>=4.0.0",
+]
+dev = [
+    "mcp-guard[test]",
+    "ruff>=0.6",
+    "psutil>=5.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/SaravanaGuhan/mcp-guard"
+Source = "https://github.com/SaravanaGuhan/mcp-guard"
+Issues = "https://github.com/SaravanaGuhan/mcp-guard/issues"
+Changelog = "https://github.com/SaravanaGuhan/mcp-guard/blob/main/CHANGELOG.md"
+
+[project.scripts]
+mcp-guard = "mcp_guard.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "mcp_guard.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mcp_guard*"]
