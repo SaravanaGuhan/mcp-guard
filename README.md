@@ -14,6 +14,22 @@ exact bytes the server sent back, recorded by the transport before anything
 parses them. Command injection is proven by a canary that only a shell can
 produce, not inferred from a payload being accepted.
 
+## Contents
+
+- [Install](#install)
+- [Quickstart](#quickstart)
+- [Sample output](#sample-output)
+- [What it detects](#what-it-detects)
+- [What it does not detect](#what-it-does-not-detect)
+- [Architecture](#architecture)
+- [Usage](#usage)
+- [Safety](#safety)
+- [Accuracy](#accuracy)
+- [Performance](#performance)
+- [Development](#development)
+- [History](#history)
+- [License](#license)
+
 ## Install
 
 ```bash
@@ -152,6 +168,145 @@ finding only if those contents come back.
 - **Dependency findings need resolved versions.** `^4.17.15` is a range, and
   MCP Guard does not guess what it resolves to.
 
+## Architecture
+
+A scan is five stages. Acquire and detect run first because everything else
+depends on what they conclude; static, dependencies and dynamic then produce
+findings independently, and the report is written last.
+
+```
+  target (path or GitHub URL)
+        |
+        v
+  +-------------+   acquire.py      fetch or open the target, record the commit
+  |   acquire   |
+  +-------------+
+        |
+        v
+  +-------------+   detect.py       server type, and a CHAIN of launch
+  |   detect    |                   candidates from the target's own metadata
+  +-------------+                   (bin, main, exports, scripts.start,
+        |                            pyproject scripts, mcp.json, workspaces)
+        |
+        +----------------+------------------+
+        |                |                  |
+        v                v                  v
+  +-----------+   +--------------+   +---------------+
+  |  static   |   | dependencies |   |    dynamic    |   requires --allow-execute
+  +-----------+   +--------------+   +---------------+
+  static/         deps/              dynamic/
+   one walk,       lockfiles.py       harness.py  launch, MCP handshake
+   one parse,       parse pins         transport.py  the only writer of
+   AST rules        osv.py             |              raw response bytes
+                     query OSV         probes.py   what to send
+                                       oracles.py  what proves a finding
+        |                |                  |
+        +----------------+------------------+
+                         |
+                         v
+                  +-------------+   report/verify.py  refuse unbacked findings
+                  |   report    |   console | summary | json | sarif
+                  +-------------+
+```
+
+The dependency stage starts on a worker thread before static runs and is joined
+after dynamic, in `scan.py`. It is network bound and the others are CPU and
+subprocess bound, so they overlap. Each stage still reports its own wall time
+rather than the overlap window: the worker times itself and the main thread only
+waits for the result.
+
+Every stage records a `ScanStatus` whether it ran or not, and a stage that did
+not run must give a reason. `ScanStatus.__post_init__` rejects `ran=False` with
+no reason, because a silently absent stage reads as a clean result.
+
+### Evidence
+
+`Finding.evidence` in `models.py` is a required field with no default. Omitting
+it is a `TypeError` from the generated `__init__`; passing `None` or anything
+that is not an Evidence instance raises in `__post_init__`. There is no code
+path that constructs a finding first and attaches evidence later.
+
+Three frozen dataclasses carry the observation, and each rejects empty raw data
+at construction:
+
+| Type | Carries | Rejects |
+|---|---|---|
+| `StaticEvidence` | file, line, column, the literal `matched_source` sliced from the parsed buffer, rule id | empty `matched_source` |
+| `DynamicEvidence` | `request_json`, `response_raw` exactly as read, the parsed form, oracle id, and why it proves the finding | empty `response_raw` |
+| `DependencyEvidence` | package, installed version, advisory ids, affected range, lockfile and line | empty advisory id |
+
+`report/verify.py` runs before any format is emitted and checks that each
+finding's evidence names a file that exists under the scanned root or carries
+non-empty response bytes. A violation raises `EvidenceViolation` and the CLI
+exits 2 without printing a report, rather than emitting one finding it cannot
+back.
+
+`transport.py` is the only writer of `response_raw`. Detection rules receive
+those bytes; they never construct them. A read timeout returns a sentinel, not a
+synthesised response.
+
+### How a dynamic finding is proven
+
+Command injection is the clearest case, because accepting a payload proves
+nothing on its own. The probe sends a marker that only a shell can produce.
+
+The payload, from `probes.py`, is `echo MCPGUARD^_<uuid>` on Windows and
+`echo MCPGUARD""_<uuid>` on POSIX. Both contain a character the shell removes:
+the caret escape, or the empty quotes. Here is a real exchange, from
+`docs/generated/sample-output.txt`:
+
+```
+sent  > {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"run",
+         "arguments":{"cmd":"echo MCPGUARD^_3c6ed270d6b346a3bef2dab49f41a3cb"}}}
+
+recv  < {"jsonrpc":"2.0","id":6,"result":{"content":[{"type":"text",
+         "text":"MCPGUARD_3c6ed270d6b346a3bef2dab49f41a3cb\r\n"}]}}
+```
+
+The sent bytes contain `MCPGUARD^_3c6ed270...`. The received bytes contain
+`MCPGUARD_3c6ed270...`, without the caret. That collapsed form never appears in
+the request, so a server that echoed the argument back, logged it, or included
+it in an error message could not produce it. Only something that ran the string
+through a shell could.
+
+`oracle_command_execution` in `oracles.py` checks exactly that: the marker is
+present in the response and absent from the request bytes. It returns the
+sentence that becomes `why_this_proves_it`, or `None` for no finding. An oracle
+that ignored its `response` argument would be the fabrication bug this codebase
+exists to prevent, so `tests/test_invariants.py` walks the AST of every
+`oracle_*` function and fails if one does not reference it.
+
+The uuid is fresh per scan. A fixed marker could be hardcoded by a target, and
+the proof would be worth nothing.
+
+The path-traversal probe works the same way: a file with unguessable contents is
+written outside the target root before launch, and the finding is reported only
+if those contents come back.
+
+### Repository layout
+
+```
+src/mcp_guard/
+  models.py        Finding, the three Evidence types, ScanStatus, ScanResult
+  rules.py         rule registry: one CVSS vector and CWE per rule
+  scan.py          stage orchestration and the dependency overlap
+  cli.py           argument parsing, output selection, exit codes
+  acquire.py       fetch a GitHub repository or open a local path
+  detect.py        server type and the launch candidate chain
+  execution.py     the only module permitted to run target code
+  static/          ast_python, ast_javascript, secrets, dockerfile, mcp_rules
+  dynamic/         transport, harness, probes, oracles
+  deps/            lockfiles, osv
+  report/          console, summary, json, sarif, verify
+  scoring/         cvss
+tests/
+  fixtures/        nine target repositories, from safe to deliberately broken
+  golden/          the findings each fixture must produce
+  schemas/         SARIF 2.1.0, for validating output
+scripts/           golden.py, benchmark.py, profile.py
+docs/generated/    produced by make targets, not edited by hand
+```
+
 ## Usage
 
 | Flag | Effect |
@@ -219,19 +374,7 @@ version, and OSV responses keyed by package URL. See
 
 ## Development
 
-```
-src/mcp_guard/     the package
-  models.py        Finding and the three Evidence types
-  rules.py         the rule registry, one CVSS vector per rule
-  scan.py          stage orchestration
-  static/          AST analyzers, secrets, Dockerfile, MCP-specific rules
-  dynamic/         transport, harness, probes, oracles
-  deps/            lockfile parsing and OSV lookup
-  report/          console, summary, json, sarif, evidence verification
-tests/             suite, fixtures, golden set
-scripts/           golden.py, benchmark.py, profile.py
-docs/generated/    produced by make targets, not edited by hand
-```
+The layout is in [Architecture](#repository-layout).
 
 ```bash
 pip install -e ".[dev]"
