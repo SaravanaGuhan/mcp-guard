@@ -1,0 +1,85 @@
+name: Bug report
+description: A scan produced a wrong result, crashed, or reported something it should not.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Three things make most reports diagnosable without a round trip: the
+        exact command, the stage table, and whether the target launched. They
+        are the required fields below.
+
+        Please do not paste a full JSON report. It contains unredacted secrets
+        found in the scanned target.
+
+  - type: input
+    id: command
+    attributes:
+      label: The exact scan command
+      description: Including every flag. Redact paths if you need to.
+      placeholder: mcp-guard ./my-server --allow-execute --sandbox docker
+    validations:
+      required: true
+
+  - type: textarea
+    id: stages
+    attributes:
+      label: The STAGES block from the report
+      description: >
+        Copy it verbatim. A finding count means nothing without knowing which
+        stages ran, and the reason text for a stage that did not run is usually
+        the answer.
+      render: text
+      placeholder: |
+        STAGES
+        ------
+          acquire       ran            0.02s
+          detect        ran            0.00s
+          static        ran            0.31s
+          dependencies  DID NOT RUN    0.00s
+               reason: offline mode: OSV lookup skipped
+          dynamic       DID NOT RUN    0.00s
+               reason: requires --allow-execute
+    validations:
+      required: true
+
+  - type: dropdown
+    id: handshake
+    attributes:
+      label: Did the target reach an MCP handshake?
+      description: >
+        The dynamic stage prints this. "Did not run" and "ran and found
+        nothing" are completely different results.
+      options:
+        - "Yes, dynamic ran"
+        - "No, dynamic reported ran=False"
+        - "Not applicable, I did not pass --allow-execute"
+        - "I do not know"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+      description: >
+        If a finding is wrong, quote the finding and its evidence block. The
+        evidence is the part that says why the tool believed it.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `mcp-guard --version`, or the commit sha.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS, Python and Node versions
+      placeholder: Windows 11, Python 3.11.9, Node 24.13.0
+    validations:
+      required: true

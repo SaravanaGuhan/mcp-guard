@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability in MCP Guard
+    url: https://github.com/SaravanaGuhan/mcp-guard/security/advisories/new
+    about: Please report privately rather than in a public issue. See SECURITY.md.

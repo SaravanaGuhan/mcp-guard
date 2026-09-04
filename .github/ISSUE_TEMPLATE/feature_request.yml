@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a new rule, probe, or capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What goes undetected today
+      description: >
+        Describe the vulnerability or gap, not the implementation. If it is a
+        new rule, a small example of vulnerable code helps most.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What observation would prove it
+      description: >
+        Every finding has to carry the observation that produced it. For a
+        static rule that is the source text and position; for a dynamic one it
+        is the bytes the server sends back. If a check cannot produce evidence
+        a reader can verify, it does not belong here.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which stage
+      options:
+        - Static analysis (AST)
+        - Dynamic analysis (probe and oracle)
+        - Dependency analysis
+        - Reporting or CLI
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: falsepositives
+    attributes:
+      label: What would make this fire wrongly
+      description: >
+        The safe forms it must not flag. A rule that cannot distinguish the
+        safe case from the unsafe one is noise.
