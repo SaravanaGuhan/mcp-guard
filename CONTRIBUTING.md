@@ -31,8 +31,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 3. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
-   pip install -e .  # Install in development mode
+   pip install -e ".[dev]"  # runtime plus test and lint tooling
    ```
 
 4. **Run tests**:
@@ -159,7 +158,9 @@ This project adheres to a code of conduct. By participating, you are expected to
 ### Code Organization
 ```
 mcp-guard/
-├── mcp_guard/              # Scanner package (models, static, dynamic, deps, report)
+├── src/mcp_guard/          # Scanner package (models, rules, static, dynamic, deps, report)
+├── scripts/                # golden.py, benchmark.py, profile.py
+├── docs/generated/         # produced by make targets, not edited by hand
 ├── simple_vulnerability_scoring.py  # Scoring system
 ├── test_*.py               # Test files
 ├── docs/                   # Documentation

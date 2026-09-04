@@ -1,9 +1,15 @@
 PY ?= python
 
-.PHONY: test cov lint sample bench clean
+.PHONY: install test cov lint sample bench golden profile clean
+
+install:
+	$(PY) -m pip install -e ".[dev]"
 
 test:
 	$(PY) -m pytest tests
+
+lint:
+	$(PY) -m ruff check src tests scripts
 
 cov:
 	$(PY) -m pytest tests --cov=mcp_guard --cov-report=html
@@ -13,13 +19,13 @@ cov:
 sample:
 	$(PY) -m mcp_guard.cli tests/fixtures/vulnerable-server \
 	    --allow-execute --skip-install --offline \
-	    > docs/sample-output.txt 2>/dev/null || true
-	@echo "wrote docs/sample-output.txt"
+	    > docs/generated/sample-output.txt 2>/dev/null || true
+	@echo "wrote docs/generated/sample-output.txt"
 
 # Regenerate the measured precision/recall table.
 bench:
-	$(PY) scripts/benchmark.py > docs/fixture-benchmark.txt 2>/dev/null || true
-	@echo "wrote docs/fixture-benchmark.txt"
+	$(PY) scripts/benchmark.py > docs/generated/fixture-benchmark.txt 2>/dev/null || true
+	@echo "wrote docs/generated/fixture-benchmark.txt"
 
 clean:
 	rm -rf .pytest_cache htmlcov .coverage
