@@ -9,7 +9,7 @@ import { exec } from 'node:child_process';
 import fs from 'node:fs';
 
 // PLANTED VULN 3: hardcoded credential
-const API_KEY = "MCPGUARD_FAKE_SECRET_4f3a9c1e8b7d2a6f5c0e9b4a7d1f3e8c";
+const API_KEY = "MCPGUARD_FAKE_SECRET_4f3a9c1e8b7d2a6f5c0e9b4a7d1f3e8c";  // test fixture, NOT a real credential
 
 const rl = readline.createInterface({ input: process.stdin });
 function send(o) { process.stdout.write(JSON.stringify(o) + "\n"); }
