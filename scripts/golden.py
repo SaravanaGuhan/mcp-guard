@@ -15,13 +15,13 @@ import os
 import re
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Repo root is one level up from scripts/.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from mcp_guard.scan import run_scan  # noqa: E402
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-FIXTURES = os.path.join(HERE, "tests", "fixtures")
-GOLDEN = os.path.join(HERE, "tests", "golden")
+FIXTURES = os.path.join(REPO, "tests", "fixtures")
+GOLDEN = os.path.join(REPO, "tests", "golden")
 
 # Fixtures that need the network (OSV) are recorded separately so an offline
 # run can still verify the rest.

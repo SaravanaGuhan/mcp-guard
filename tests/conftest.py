@@ -18,7 +18,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "fixtures")
 REPO = os.path.dirname(HERE)
 
-sys.path.insert(0, REPO)
+# mcp_guard is NOT put on sys.path here. With a src layout the tests import
+# whatever is installed, so a broken package cannot be masked by the working
+# tree sitting next to the tests. Install with `pip install -e ".[dev]"`.
+#
+# scripts/ is a different matter: it holds dev tooling that the suite drives
+# (the golden set generator), and it is deliberately not part of the shipped
+# package, so it needs an explicit path entry.
+sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 
 def fixture_path(name: str) -> str:

@@ -19,12 +19,12 @@ import pytest
 
 from conftest import REPO, needs_network, needs_node
 
-import tools_golden
+import golden as golden_tool
 
 GOLDEN = os.path.join(REPO, "tests", "golden")
 
-OFFLINE_FIXTURES = [f for f in tools_golden.ALL
-                    if f not in tools_golden.NETWORK_FIXTURES]
+OFFLINE_FIXTURES = [f for f in golden_tool.ALL
+                    if f not in golden_tool.NETWORK_FIXTURES]
 
 
 def load_golden(name: str) -> dict:
@@ -50,7 +50,7 @@ def _diff(expected: list, actual: list) -> str:
 @pytest.mark.parametrize("fixture", OFFLINE_FIXTURES)
 def test_findings_match_golden(fixture):
     expected = load_golden(fixture)
-    actual = tools_golden.scan_fixture(fixture)
+    actual = golden_tool.scan_fixture(fixture)
 
     assert actual["finding_count"] == expected["finding_count"], (
         f"{fixture}: finding count changed "
@@ -67,7 +67,7 @@ def test_findings_match_golden(fixture):
 def test_stage_outcomes_match_golden(fixture):
     """Whether a stage ran, and why not, is part of the contract."""
     expected = load_golden(fixture)
-    actual = tools_golden.scan_fixture(fixture)
+    actual = golden_tool.scan_fixture(fixture)
 
     for stage, exp in expected["stages"].items():
         got = actual["stages"].get(stage)
@@ -81,7 +81,7 @@ def test_stage_outcomes_match_golden(fixture):
 @pytest.mark.parametrize("fixture", OFFLINE_FIXTURES)
 def test_detection_metadata_matches_golden(fixture):
     expected = load_golden(fixture)
-    actual = tools_golden.scan_fixture(fixture)
+    actual = golden_tool.scan_fixture(fixture)
     assert actual["server_type"] == expected["server_type"]
     assert actual["is_mcp_server"] == expected["is_mcp_server"]
 
@@ -89,7 +89,7 @@ def test_detection_metadata_matches_golden(fixture):
 @needs_network
 def test_dependency_findings_match_golden():
     expected = load_golden("vuln-deps")
-    actual = tools_golden.scan_fixture("vuln-deps")
+    actual = golden_tool.scan_fixture("vuln-deps")
 
     exp_ids = {r["advisory_id"] for r in expected["findings"]
                if r["evidence_kind"] == "dependency"}

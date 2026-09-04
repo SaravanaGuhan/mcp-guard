@@ -18,7 +18,7 @@ sample:
 
 # Regenerate the measured precision/recall table.
 bench:
-	$(PY) tools_measure.py > docs/fixture-benchmark.txt 2>/dev/null || true
+	$(PY) scripts/benchmark.py > docs/fixture-benchmark.txt 2>/dev/null || true
 	@echo "wrote docs/fixture-benchmark.txt"
 
 clean:
@@ -26,9 +26,9 @@ clean:
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
 
 golden:
-	$(PY) tools_golden.py
+	$(PY) scripts/golden.py
 	@echo "regenerated tests/golden/ -- justify every delta in the commit"
 
 profile:
-	$(PY) tools_profile.py > docs/profile-baseline.md
+	$(PY) scripts/profile.py > docs/profile-baseline.md
 	@echo "wrote docs/profile-baseline.md"

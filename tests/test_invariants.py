@@ -14,7 +14,11 @@ import pytest
 
 from conftest import REPO, needs_node, run_scan_on
 
-PKG = os.path.join(REPO, "mcp_guard")
+# Derived from the INSTALLED package, not from the repo layout: with a src
+# layout the tests assert against what is importable, and this keeps working if
+# the directory moves again.
+import mcp_guard as _pkg
+PKG = os.path.dirname(_pkg.__file__)
 
 BANNED_PHRASES = (
     "for realistic results",

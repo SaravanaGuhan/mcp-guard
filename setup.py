@@ -14,7 +14,8 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/SaravanaGuhan/mcp-guard",
     license="MIT",
-    packages=find_packages(include=["mcp_guard", "mcp_guard.*"]),
+    package_dir={"": "src"},
+    packages=find_packages(where="src"),
     python_requires=">=3.10",
     install_requires=[
         "requests>=2.31.0",

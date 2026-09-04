@@ -16,10 +16,9 @@ import sys
 import time
 from collections import Counter, defaultdict
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-FIXTURES = os.path.join(HERE, "tests", "fixtures")
+# Repo root is one level up from scripts/, so this runs from any cwd.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES = os.path.join(REPO, "tests", "fixtures")
 REAL = os.environ.get("MCPGUARD_REAL_REPOS",
                       r"C:\Users\Work\AppData\Local\Temp\audit\real")
 
