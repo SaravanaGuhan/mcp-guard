@@ -29,6 +29,14 @@ class Rule:
     remediation: str
     references: List[str] = field(default_factory=list)
 
+    # Which AIVSS v0.8 risk amplification factors amplify THIS finding class.
+    # Section 3.3.1 says to review the ten factors "for each vulnerability", so
+    # they are scored per finding. Factors absent from this tuple score 0.0 as
+    # "not applicable to this finding class", which is a scored value rather
+    # than an assumption about the deployment. A hardcoded credential and a
+    # command injection through a tool do not amplify the same way.
+    agentic_factors: tuple = ()
+
     @property
     def score(self) -> float:
         return score_for(self.vector)[1]
@@ -82,6 +90,7 @@ register(Rule(
         "Do not pass tool arguments to a shell. Use execFile/spawn with an argument "
         "vector, validate against an allowlist, and reject shell metacharacters."
     ),
+    agentic_factors=("tools", "language", "autonomy"),
 ))
 
 register(Rule(
@@ -98,6 +107,7 @@ register(Rule(
         "Resolve the path and verify it is contained by an allowed root "
         "(os.path.realpath + prefix check / path.resolve + startsWith) before reading."
     ),
+    agentic_factors=("tools", "autonomy", "persistence"),
 ))
 
 register(Rule(
@@ -112,6 +122,7 @@ register(Rule(
     ),
     method="protocol-probe",
     remediation="Reject unknown methods with JSON-RPC error -32601.",
+    agentic_factors=("tools", "autonomy"),
 ))
 
 register(Rule(
@@ -125,6 +136,7 @@ register(Rule(
     ),
     method="protocol-probe",
     remediation="Return -32601 for methods the server does not implement.",
+    agentic_factors=("tools",),
 ))
 
 register(Rule(
@@ -136,6 +148,7 @@ register(Rule(
     rationale="Process exited while handling a malformed frame.",
     method="protocol-probe",
     remediation="Catch parse/validation errors and reply with -32700 / -32600.",
+    agentic_factors=(),
 ))
 
 register(Rule(
@@ -146,6 +159,7 @@ register(Rule(
     rationale="Response carried neither result nor error, or echoed a bad id.",
     method="protocol-probe",
     remediation="Always answer with exactly one of result/error and the request id.",
+    agentic_factors=(),
 ))
 
 register(Rule(
@@ -156,6 +170,7 @@ register(Rule(
     rationale="Server returned a success result for arguments its schema forbids.",
     method="protocol-probe",
     remediation="Validate arguments against the declared inputSchema before dispatch.",
+    agentic_factors=("tools", "language"),
 ))
 
 
@@ -171,6 +186,7 @@ register(Rule(
     rationale="Intraprocedural taint from a handler parameter to subprocess/eval/exec.",
     method="ast",
     remediation="Pass an argument vector, never shell=True with request data.",
+    agentic_factors=("tools", "language", "autonomy"),
 ))
 
 register(Rule(
@@ -181,6 +197,7 @@ register(Rule(
     rationale="Intraprocedural taint from a handler parameter to open()/pathlib.",
     method="ast",
     remediation="Resolve and containment-check the path before opening it.",
+    agentic_factors=("tools", "autonomy", "persistence"),
 ))
 
 register(Rule(
@@ -191,6 +208,7 @@ register(Rule(
     rationale="exec/execSync/spawn called with a non-literal command expression.",
     method="ast",
     remediation="Use execFile/spawn with a fixed binary and an argument array.",
+    agentic_factors=("tools", "language", "autonomy"),
 ))
 
 register(Rule(
@@ -201,6 +219,7 @@ register(Rule(
     rationale="fs.* called with a non-literal path expression.",
     method="ast",
     remediation="path.resolve() then verify the result is inside an allowed root.",
+    agentic_factors=("tools", "autonomy", "persistence"),
 ))
 
 register(Rule(
@@ -211,6 +230,7 @@ register(Rule(
     rationale="vm.runInNewContext / eval / new Function on a non-literal.",
     method="ast",
     remediation="Remove dynamic evaluation; parse data as data.",
+    agentic_factors=("tools", "language", "autonomy", "self_mod"),
 ))
 
 register(Rule(
@@ -222,6 +242,7 @@ register(Rule(
     rationale="Structural match (known prefix or secret-ish assignment) AND high entropy.",
     method="regex+entropy",
     remediation="Move the secret to an environment variable and rotate it.",
+    agentic_factors=("identity", "persistence"),
 ))
 
 register(Rule(
@@ -232,6 +253,7 @@ register(Rule(
     rationale="No USER directive, or an explicit USER root/0.",
     method="ast",
     remediation="Add a non-root USER before CMD/ENTRYPOINT.",
+    agentic_factors=("autonomy",),
 ))
 
 register(Rule(
@@ -242,6 +264,7 @@ register(Rule(
     rationale="chmod 777 / a+rwx in a RUN layer.",
     method="ast",
     remediation="Grant the narrowest permissions the process needs.",
+    agentic_factors=("autonomy",),
 ))
 
 register(Rule(
@@ -252,6 +275,7 @@ register(Rule(
     rationale="curl/wget piped into sh/bash in a RUN layer.",
     method="ast",
     remediation="Download, verify a checksum or signature, then execute.",
+    agentic_factors=("tools", "autonomy"),
 ))
 
 register(Rule(
@@ -262,6 +286,7 @@ register(Rule(
     rationale="ADD with an http(s) source performs an unverified fetch.",
     method="ast",
     remediation="Use COPY for local files; fetch remotes explicitly with verification.",
+    agentic_factors=("tools", "autonomy"),
 ))
 
 register(Rule(
@@ -272,6 +297,7 @@ register(Rule(
     rationale="FROM ...:latest or an untagged base is not reproducible.",
     method="ast",
     remediation="Pin the base image by digest or an immutable tag.",
+    agentic_factors=(),
 ))
 
 register(Rule(
@@ -282,6 +308,7 @@ register(Rule(
     rationale="Secret-ish key assigned a literal value in an image layer.",
     method="ast",
     remediation="Inject secrets at runtime; image layers are readable by anyone.",
+    agentic_factors=("identity", "persistence"),
 ))
 
 
@@ -297,6 +324,7 @@ register(Rule(
     rationale="Handler body indexes arguments not present in the declared schema.",
     method="ast",
     remediation="Declare every accepted key in inputSchema and validate against it.",
+    agentic_factors=("tools", "language"),
 ))
 
 register(Rule(
@@ -310,6 +338,7 @@ register(Rule(
     ),
     method="ast",
     remediation="Describe what the tool does; never instruct the model in a description.",
+    agentic_factors=("language", "autonomy", "context", "multi_agent"),
 ))
 
 register(Rule(
@@ -320,6 +349,7 @@ register(Rule(
     rationale="URI/path built by string concatenation with no containment check.",
     method="ast",
     remediation="Resolve to an absolute path and verify containment before use.",
+    agentic_factors=("tools", "autonomy", "persistence"),
 ))
 
 
@@ -339,4 +369,5 @@ register(Rule(
     method="osv",
     remediation="Upgrade to a version outside the affected range.",
     references=["https://osv.dev/"],
+    agentic_factors=("tools", "autonomy"),
 ))

@@ -117,6 +117,15 @@ def build_parser() -> argparse.ArgumentParser:
              "report (default: medium); JSON is never filtered",
     )
     out.add_argument(
+        "--aivss-factors",
+        help="agentic factors the scanner cannot observe, as "
+             "factor=value pairs, e.g. 'autonomy=1.0,persistence=0.5'. "
+             "Values must be 0.0, 0.5 or 1.0 per OWASP AIVSS v0.8 section "
+             "2.3. Supplied values are recorded as operator-supplied rather "
+             "than observed. Factors left out stay unobserved and the score "
+             "stays a bound.",
+    )
+    out.add_argument(
         "--fail-on",
         choices=("none", "low", "medium", "high", "critical"),
         default="high",
@@ -129,6 +138,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
 
     from .scan import run_scan
+    from .scoring.agentic import parse_operator_factors
+    from .scoring.aivss import InvalidFactorVector
+
+    operator_factors = None
+    if args.aivss_factors:
+        try:
+            operator_factors = parse_operator_factors(args.aivss_factors)
+        except InvalidFactorVector as exc:
+            print(f"mcp-guard: --aivss-factors: {exc}", file=sys.stderr)
+            return EXIT_ERROR
 
     acquired = None
     try:
@@ -146,6 +165,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             progress=not args.quiet,
             probe_budget=args.probe_budget,
             handshake_timeout=args.handshake_timeout,
+            aivss_factors=operator_factors,
         )
 
         acq = result.status("acquire")

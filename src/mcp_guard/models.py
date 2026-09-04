@@ -190,6 +190,11 @@ class Finding:
     remediation: str = ""
     references: List[str] = field(default_factory=list)
 
+    # OWASP AIVSS v0.8, computed by scoring/aivss.py. Additional to CVSS, never
+    # a replacement: Finding.severity still derives from cvss_score, so nothing
+    # downstream shifts. None when AIVSS was not computed.
+    aivss: Optional[Any] = None
+
     def __post_init__(self) -> None:
         if self.evidence is None:
             raise TypeError(
@@ -232,6 +237,7 @@ class Finding:
             "remediation": self.remediation,
             "references": list(self.references),
             "evidence": self.evidence.as_dict(),
+            "aivss": self.aivss.as_dict() if self.aivss is not None else None,
         }
 
 

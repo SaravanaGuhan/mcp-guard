@@ -46,6 +46,20 @@ named a real project against fabricated results.
 
 ### Added
 
+- OWASP AIVSS v0.8 scoring, implemented in `scoring/aivss.py` against the
+  published specification rather than approximated. The formula, factor order,
+  0.0/0.5/1.0 rubric, threat multiplier and mitigation factor tables and
+  severity bands are the specification's. Every emitted score names the spec
+  and its version.
+  Only one of the ten agentic amplification factors, the external tool control
+  surface, is observable by a scanner; it comes from `tools/list` and from
+  whether a canary probe proved a tool reaches a shell. The other nine are
+  deployment properties. They are reported as unobserved rather than defaulted
+  or assumed absent, so the emitted value is a bound and the report says which
+  factors could not be determined. `--aivss-factors` lets an operator supply
+  them, recorded as operator-supplied. CVSS remains the primary score and
+  `Finding.severity` still derives from it alone.
+
 - Evidence is structural. `Finding.evidence` is required with no default;
   `StaticEvidence` / `DynamicEvidence` / `DependencyEvidence` are frozen and
   reject empty raw data at construction. A report writer verifies that every

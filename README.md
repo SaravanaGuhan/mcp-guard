@@ -22,6 +22,7 @@ produce, not inferred from a payload being accepted.
 - [What it detects](#what-it-detects)
 - [What it does not detect](#what-it-does-not-detect)
 - [Architecture](#architecture)
+- [Scoring](#scoring)
 - [Usage](#usage)
 - [Safety](#safety)
 - [Accuracy](#accuracy)
@@ -130,8 +131,9 @@ know which stages ran.
 | `MCPG-DEP-KNOWN-VULN` | OSV lookup | CWE-1395 | published |
 
 Scores come from a hand-authored CVSS v4.0 vector attached to each rule in
-`src/mcp_guard/rules.py`; severity is derived from the score. No rule carries a
-hand-written number, and a test recomputes every score from its vector.
+`src/mcp_guard/rules.py`, and severity derives from the score. No rule carries
+a hand-written number, and a test recomputes every score from its vector. An
+OWASP AIVSS v0.8 score is reported alongside; see [Scoring](#scoring).
 
 The command-injection probe sends `echo MCPGUARD""_<id>` on POSIX and
 `echo MCPGUARD^_<id>` on Windows. A shell collapses the quoting and prints
@@ -298,7 +300,7 @@ src/mcp_guard/
   dynamic/         transport, harness, probes, oracles
   deps/            lockfiles, osv
   report/          console, summary, json, sarif, verify
-  scoring/         cvss
+  scoring/         cvss, aivss, agentic factor observation
 tests/
   fixtures/        nine target repositories, from safe to deliberately broken
   golden/          the findings each fixture must produce
@@ -306,6 +308,82 @@ tests/
 scripts/           golden.py, benchmark.py, profile.py
 docs/generated/    produced by make targets, not edited by hand
 ```
+
+## Scoring
+
+Two scores, computed from vectors rather than authored.
+
+**CVSS v4.0** is the primary score. Each rule in `src/mcp_guard/rules.py`
+carries a hand-authored base vector with a justification per metric, and
+`scoring/cvss.py` computes the number from it. `Finding.severity` derives from
+that score and from nothing else, so exit codes, sorting and the severity floor
+depend only on CVSS.
+
+**OWASP AIVSS v0.8** is additional, never a replacement. It is implemented in
+`scoring/aivss.py` against
+[AIVSS Scoring System For OWASP Agentic AI Core Security Risks v0.8](https://aivss.owasp.org/),
+using the specification's own formula:
+
+```
+Factor_Sum = sum of the ten Risk Amplification Factors, each 0.0, 0.5 or 1.0
+AARS       = (10 - CVSS_Base) * (Factor_Sum / 10) * ThM
+AIVSS      = RoundHalfUp((CVSS_Base + AARS) * Mitigation_Factor, 1)
+```
+
+The factor order, the 0.0/0.5/1.0 rubric, the threat multiplier table
+(0.97 by default, Proof-of-Concept), the mitigation factor table (1.0 by
+default, no or weak mitigation) and the severity bands are the specification's.
+
+### What the scanner can and cannot observe
+
+AIVSS combines a technical baseline with ten agentic amplification factors. A
+repository scanner can see one of them.
+
+| Factor | Observable | From what |
+|---|---|---|
+| External Tool Control Surface | yes | `tools/list` during the dynamic stage, plus whether a canary probe proved a tool reaches a shell |
+| Execution Autonomy | no | whether a human co-signs actions is a deployment choice |
+| Natural Language Interface | no | depends on the client wired to the server |
+| Contextual Awareness | no | environmental signals come from the deployment |
+| Behavioral Non-Determinism | no | a property of the model behind the client |
+| Opacity and Reflexivity | no | depends on the operator's logging and audit setup |
+| Persistent State Retention | no | memory across sessions is a deployment property |
+| Dynamic Identity | no | runtime role assumption is configured by the operator |
+| Multi-Agent Interactions | no | not visible from one repository |
+| Self-Modification | no | whether the agent may rewrite its own config is a permission |
+
+An unobserved factor is reported as unobserved. It is not defaulted to a middle
+value and not assumed absent, because either would be inventing data. The score
+is emitted as a **bound**: the low end scores every unknown factor 0.0, the high
+end scores it 1.0, and the true value lies between. The report says so in those
+words and lists the factors it could not determine:
+
+```
+aivss: partial AIVSS 9.5 to 9.6, OWASP AIVSS v0.8. 2 of 10 factors could not
+be determined by scanning: Execution Autonomy, Natural Language Interface
+```
+
+Each rule declares which factors amplify it, because a hardcoded credential and
+a command injection through a tool do not amplify the same way. Factors a rule
+is not affected by score 0.0 as "not applicable to this finding class", which
+is a scored value rather than an assumption about the deployment. Section 3.3.1
+of the specification asks for the factors to be reviewed per vulnerability,
+which is what this does.
+
+An operator who knows their deployment can supply the rest:
+
+```bash
+mcp-guard . --allow-execute --aivss-factors 'autonomy=1.0,persistence=0.5'
+```
+
+Supplied values are recorded as operator-supplied rather than observed, so a
+reader can tell which is which. When all ten factors are known the bound
+collapses to a single AIVSS score.
+
+AIVSS appears in the JSON report always, and in the console only when the
+dynamic stage ran. Without `tools/list` even the one observable factor is
+unknown, and every finding would carry the same maximally wide bound, which is
+noise rather than information.
 
 ## Usage
 
@@ -322,6 +400,7 @@ docs/generated/    produced by make targets, not edited by hand
 | `--no-cache` | Bypass the static result cache. |
 | `--quiet` | Suppress per-stage progress on stderr. |
 | `--min-severity`, `--include-transitive`, `--include-dev` | Console density. JSON is never filtered. |
+| `--aivss-factors` | Agentic factors the scanner cannot observe, as `factor=value` pairs. See [Scoring](#scoring). |
 | `--fail-on none\|low\|medium\|high\|critical` | Exit-code threshold, default `high`. |
 
 Output formats: `console` (default), `summary`, `json`, `sarif`. SARIF is

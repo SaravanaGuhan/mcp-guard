@@ -84,6 +84,7 @@ def run_scan(
     progress: bool = False,
     probe_budget: float = 30.0,
     handshake_timeout: float = 10.0,
+    aivss_factors=None,
 ) -> tuple[ScanResult, Optional[Acquired]]:
     _PROGRESS["on"] = progress
     result = ScanResult(
@@ -232,5 +233,43 @@ def run_scan(
     if deps_pool is not None:
         deps_pool.shutdown(wait=True)
 
+    _apply_aivss(result, operator_factors=aivss_factors)
+
     result.finished_at = datetime.now(timezone.utc).isoformat()
     return result, acquired
+
+
+def _apply_aivss(result: ScanResult, operator_factors=None) -> None:
+    """Attach an OWASP AIVSS v0.8 score to every finding.
+
+    Additional to CVSS, never a replacement. Finding.severity still derives
+    from cvss_score, so exit codes, sorting and the severity floor are
+    unchanged by anything here.
+
+    The tool surface is only observable when the dynamic stage ran and read
+    tools/list. When it did not, that factor is unobserved like the other
+    nine, and the emitted score is a bound rather than a number.
+    """
+    from .rules import get as get_rule
+    from .scoring import agentic
+    from .scoring.aivss import score as aivss_score
+
+    dyn = result.status("dynamic")
+    dynamic_artifacts = dyn.artifacts if (dyn and dyn.ran) else None
+
+    # A tool proven to reach a shell is direct evidence of tool privilege.
+    shell_proven = any(
+        f.rule_id == "MCPG-DYN-CMDEXEC" for f in result.findings)
+
+    for finding in result.findings:
+        try:
+            rule = get_rule(finding.rule_id)
+        except KeyError:
+            continue
+        observations = agentic.build_observations(
+            rule.agentic_factors,
+            dynamic_artifacts=dynamic_artifacts,
+            shell_proven=shell_proven,
+            operator_factors=operator_factors,
+        )
+        finding.aivss = aivss_score(finding.cvss_score, observations)

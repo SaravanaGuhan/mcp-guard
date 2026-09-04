@@ -75,6 +75,13 @@ def _evidence_block(f: Finding) -> List[str]:
 
 
 def render(result: ScanResult, shown=None, suppressed: int = 0) -> str:
+    # AIVSS is shown only when the dynamic stage ran. Without tools/list the
+    # tool-surface factor is unobserved too, and every finding would carry the
+    # same maximally-wide bound, which is noise rather than information. It is
+    # always present in the JSON report.
+    dyn = result.status("dynamic")
+    show_aivss = bool(dyn and dyn.ran)
+
     L: List[str] = []
     L.append(BAR)
     L.append("MCP GUARD SECURITY REPORT")
@@ -156,6 +163,8 @@ def render(result: ScanResult, shown=None, suppressed: int = 0) -> str:
             )
             L.append(f"      {head.title}")
             L.append(f"      cwe: {head.cwe}   vector: {head.cvss_vector}")
+            if show_aivss and head.aivss is not None:
+                L.append(f"      aivss: {head.aivss.summary()}")
             L.extend(_evidence_block(head))
 
             if n > 1:
