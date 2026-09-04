@@ -1,4 +1,5 @@
 PY ?= python
+SAMPLE := docs/generated/sample-output.txt
 
 .PHONY: install test cov lint sample bench golden profile clean
 
@@ -17,10 +18,11 @@ cov:
 
 # Regenerate the README sample from a real run so it cannot drift.
 sample:
+	@$(PY) -c "import io,sys; io.open(sys.argv[1],'w',encoding='utf-8',newline=chr(10)).write(open(sys.argv[2],encoding='utf-8').read())" $(SAMPLE) docs/generated/sample-output.header
 	$(PY) -m mcp_guard.cli tests/fixtures/vulnerable-server \
-	    --allow-execute --skip-install --offline \
-	    > docs/generated/sample-output.txt 2>/dev/null || true
-	@echo "wrote docs/generated/sample-output.txt"
+	    --allow-execute --skip-install --offline --quiet \
+	    >> $(SAMPLE) 2>/dev/null || true
+	@echo "wrote $(SAMPLE)"
 
 # Regenerate the measured precision/recall table.
 bench:
